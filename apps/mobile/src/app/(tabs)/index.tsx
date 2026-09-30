@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
-import { moodOption, toLocalDate } from '@journal/shared';
+import { formatTime12, moodOption, toLocalDate } from '@journal/shared';
+import { ReminderCarousel } from '../../components/ReminderCarousel';
 import { SessionBanner } from '../../components/SessionBanner';
 import {
   Body,
@@ -19,7 +20,7 @@ import {
 } from '../../components/ui';
 import { MiniBars, shortDay } from '../../components/widgets';
 import { loadDashboard } from '../../data/dashboard';
-import { space, useTheme } from '../../lib/theme';
+import { radius, space, useTheme } from '../../lib/theme';
 import { usePrefs } from '../../state/prefs';
 import { useCtx, useSession } from '../../state/session';
 import { syncService } from '../../state/sync';
@@ -45,7 +46,7 @@ export default function Dashboard() {
   });
 
   if (isLoading || !data) return <Loading />;
-  const { habits, journal, urges, week } = data;
+  const { habits, journal, urges, week, reminders, intention } = data;
   const mood = moodOption(journal.mood);
 
   return (
@@ -62,6 +63,30 @@ export default function Dashboard() {
     >
       <SessionBanner />
       <Title>{user ? greeting(user.name) : 'Hello'}</Title>
+
+      <ReminderCarousel reminders={reminders} onPress={() => router.navigate('/profile/reminders', { withAnchor: true })} />
+
+      {intention && (
+        <View
+          accessible
+          accessibilityLabel={`Your focus today, from yesterday's reflection: ${intention.text}`}
+          style={{
+            backgroundColor: c.successSoft,
+            borderRadius: radius.lg,
+            padding: space.lg,
+            gap: space.xs,
+            borderLeftWidth: 4,
+            borderLeftColor: c.success,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+            <Ionicons name="flag-outline" size={16} color={c.success} />
+            <Muted style={{ color: c.success, fontWeight: '700' }}>Your focus today</Muted>
+          </View>
+          <Body style={{ fontSize: 17, fontWeight: '600' }}>{intention.text}</Body>
+          <Muted>From yesterday's reflection</Muted>
+        </View>
+      )}
 
       <Card>
         <SectionTitle>Today's habits</SectionTitle>
@@ -128,17 +153,18 @@ export default function Dashboard() {
               <Muted>Recent</Muted>
               {urges.recent.map((u) => (
                 <Muted key={u.id} numberOfLines={1}>
-                  {shortDay(u.localDate)} {u.localTime.slice(0, 5)} · intensity {u.intensity}
+                  {shortDay(u.localDate)} {formatTime12(u.localTime)} · intensity {u.intensity}
                   {u.triggerText ? ` · ${u.triggerText}` : ''}
                 </Muted>
               ))}
             </View>
           )}
+          <Button title="Breathe for 2 min" icon="leaf-outline" onPress={() => router.navigate('/urges/breathe', { withAnchor: true })} />
           <Button
             title="Record an urge"
             icon="add-circle-outline"
             variant="secondary"
-            onPress={() => router.navigate('/urges/new')}
+            onPress={() => router.navigate('/urges/new', { withAnchor: true })}
           />
         </Card>
       )}

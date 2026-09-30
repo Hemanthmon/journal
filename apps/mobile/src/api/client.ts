@@ -3,7 +3,13 @@ import type { ApiErrorBody, AuthResponse } from '@journal/shared';
 import { API_URL } from '../lib/config';
 import { tokens } from './tokens';
 
-export const api = axios.create({ baseURL: `${API_URL}/api`, timeout: 20_000 });
+/**
+ * Generous timeout: the free Render plan sleeps when idle and takes up to ~1 minute to
+ * wake, and the first request after that (often a login) must not give up early.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+export const api = axios.create({ baseURL: `${API_URL}/api`, timeout: REQUEST_TIMEOUT_MS });
 
 api.interceptors.request.use((cfg) => {
   if (tokens.access) cfg.headers.set('Authorization', `Bearer ${tokens.access}`);
@@ -25,7 +31,7 @@ export function refreshTokens(): Promise<RefreshResult> {
     const refreshToken = tokens.refresh;
     if (!refreshToken) return 'invalid';
     try {
-      const res = await axios.post<{ data: AuthResponse }>(`${API_URL}/api/auth/refresh`, { refreshToken }, { timeout: 20_000 });
+      const res = await axios.post<{ data: AuthResponse }>(`${API_URL}/api/auth/refresh`, { refreshToken }, { timeout: REQUEST_TIMEOUT_MS });
       await tokens.save(res.data.data.tokens);
       await tokens.saveUser(res.data.data.user);
       return 'ok';

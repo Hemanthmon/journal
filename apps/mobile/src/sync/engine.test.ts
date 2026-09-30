@@ -132,6 +132,30 @@ describe('sync status', () => {
   });
 });
 
+describe('app newer than server', () => {
+  it('keeps record types the server does not know yet queued, instead of dropping them', async () => {
+    const { db, ctx, server, engine } = await setup();
+    const { createReminder } = await import('../data/reminders');
+    const r = await createReminder(ctx, 'Drink water');
+    server.respond = (req) => ({
+      epoch: 1,
+      results: req.changes.map((c) => ({ changeId: c.changeId, status: 'rejected' as const, errorCode: 'UNKNOWN_ENTITY' as const })),
+    });
+    const state = await engine.sync();
+    expect(state).toMatchObject({ pending: 1, rejected: 0 });
+    expect((await getLocal(db, 'reminders', r.id))?.syncStatus).toBe('pending');
+
+    // Server updated: the queued reminder uploads.
+    server.respond = (req) => ({
+      epoch: 1,
+      results: req.changes.map((c) => ({ changeId: c.changeId, status: 'applied' as const, serverSeq: 99 })),
+    });
+    const after = await engine.sync();
+    expect(after).toMatchObject({ pending: 0, rejected: 0 });
+    expect((await getLocal(db, 'reminders', r.id))?.syncStatus).toBe('synced');
+  });
+});
+
 describe('journal conflicts', () => {
   it('keeps both versions and lets the user resolve', async () => {
     const { db, ctx, server, engine } = await setup();

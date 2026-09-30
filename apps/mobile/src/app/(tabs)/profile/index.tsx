@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { formatTime12 } from '@journal/shared';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import { SessionBanner } from '../../../components/SessionBanner';
@@ -120,6 +121,7 @@ export default function Profile() {
         <SectionTitle>Daily Routine Settings</SectionTitle>
         <LinkRow icon="checkmark-done-outline" label="Manage habits" onPress={() => router.push('/profile/habits')} />
         <LinkRow icon="chatbubbles-outline" label="Manage questions" onPress={() => router.push('/profile/questions')} />
+        <LinkRow icon="sparkles-outline" label="Daily reminders" onPress={() => router.push('/profile/reminders')} />
       </Card>
 
       <Card>
@@ -171,18 +173,18 @@ export default function Profile() {
         <Body style={{ fontWeight: '600' }}>Notifications</Body>
         {remindersSupported ? (
           <ToggleRow
-            label="Daily reminder"
-            hint="A gentle, generic reminder. Nothing personal is shown on the lock screen."
+            label="Daily notification"
+            hint="A gentle, generic nudge to open the app. Nothing personal is shown on the lock screen."
             value={prefs.reminderEnabled}
             onChange={(v) => void setReminder(v)}
           />
         ) : (
-          <Muted>Daily reminders aren't available in Expo Go on Android. They work in an installed build of the app.</Muted>
+          <Muted>Daily notifications aren't available in Expo Go on Android. They work in the installed app.</Muted>
         )}
         {remindersSupported && prefs.reminderEnabled && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
             {REMINDER_TIMES.map((t) => (
-              <Chip key={t} label={t} selected={prefs.reminderTime === t} onPress={() => void setReminder(true, t)} />
+              <Chip key={t} label={formatTime12(t)} selected={prefs.reminderTime === t} onPress={() => void setReminder(true, t)} />
             ))}
           </View>
         )}

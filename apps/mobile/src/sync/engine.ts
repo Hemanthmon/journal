@@ -277,6 +277,14 @@ export class SyncEngine {
             [entity, e.record_id, JSON.stringify(r.record), now.toISOString()],
           );
           await tx.run(`UPDATE ${table} SET sync_status = 'conflict' WHERE id = ?`, [e.record_id]);
+        } else if (r.status === 'rejected' && r.errorCode === 'UNKNOWN_ENTITY') {
+          // The server doesn't know this record type yet (app newer than the server).
+          // Keep it queued so it uploads once the server is updated.
+          await tx.run('UPDATE outbox SET attempts = attempts + 1, last_error = ? WHERE entity = ? AND record_id = ?', [
+            'Waiting for server update',
+            entity,
+            e.record_id,
+          ]);
         } else if (r.status === 'rejected') {
           await tx.run('DELETE FROM outbox WHERE entity = ? AND record_id = ?', [entity, e.record_id]);
           await tx.run(`UPDATE ${table} SET sync_status = 'rejected' WHERE id = ?`, [e.record_id]);

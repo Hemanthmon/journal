@@ -8,6 +8,7 @@ import {
   type JournalAnswerRecord,
   type JournalQuestionRecord,
 } from './schemas/questions';
+import { reminderRecordSchema, type ReminderRecord } from './schemas/reminders';
 import { urgeRecordSchema, type UrgeRecord } from './schemas/urges';
 
 /**
@@ -139,6 +140,17 @@ export const ENTITIES = {
     schema: urgeRecordSchema,
     stickyDelete: true,
   },
+  reminders: {
+    table: 'reminders',
+    fields: [
+      ...BASE_FIELDS,
+      f('text', 'text', 'string'),
+      f('isActive', 'is_active', 'bool'),
+      f('displayOrder', 'display_order', 'number'),
+    ],
+    schema: reminderRecordSchema,
+    stickyDelete: true,
+  },
 } satisfies Record<string, EntityDef>;
 
 export type EntityName = keyof typeof ENTITIES;
@@ -151,6 +163,7 @@ export const ENTITY_ORDER: EntityName[] = [
   'habitLogs',
   'journalAnswers',
   'urges',
+  'reminders',
 ];
 
 export interface EntityRecordMap {
@@ -160,6 +173,7 @@ export interface EntityRecordMap {
   habitLogs: HabitLogRecord;
   journalAnswers: JournalAnswerRecord;
   urges: UrgeRecord;
+  reminders: ReminderRecord;
 }
 
 export type AnyRecord = EntityRecordMap[EntityName];

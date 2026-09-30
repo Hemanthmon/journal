@@ -253,6 +253,26 @@ describe('sync push/pull', () => {
   });
 });
 
+describe('reminders', () => {
+  it('sync like other records, including soft deletes', async () => {
+    const { auth } = await setup();
+    const base = (await pull(auth)).nextCursor;
+    const now = iso();
+    const rec = { id: randomUUID(), createdAt: now, updatedAt: now, deletedAt: null, text: 'Phone stays outside the bedroom', isActive: true, displayOrder: 0 };
+    const res = await push(auth, [change('reminders', rec), change('reminders', { ...rec, id: randomUUID(), text: '' })]);
+    expect(res.body.data.results.map((r: PushResult) => [r.status, r.errorCode])).toEqual([
+      ['applied', undefined],
+      ['rejected', 'INVALID'],
+    ]);
+    const pulled = await pull(auth, base);
+    expect(pulled.changes.map((c) => [c.entity, c.record.text])).toEqual([['reminders', 'Phone stays outside the bedroom']]);
+
+    await push(auth, [change('reminders', { ...rec, deletedAt: iso(1000), updatedAt: iso(1000) })]);
+    const late = await push(auth, [change('reminders', { ...rec, text: 'edited offline', updatedAt: iso(5000) })]);
+    expect(late.body.data.results[0].status).toBe('stale');
+  });
+});
+
 describe('account data deletion', () => {
   it('deletes personal data, bumps the epoch, and makes old devices re-download', async () => {
     const { auth, password } = await setup();

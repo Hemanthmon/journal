@@ -12,7 +12,7 @@ export function SessionBanner() {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Sign in again to resume syncing"
-      onPress={() => router.push('/profile/reauth')}
+      onPress={() => router.push('/profile/reauth', { withAnchor: true })}
       style={{ backgroundColor: c.primarySoft, padding: space.md, borderRadius: radius.md }}
     >
       <Text style={{ color: c.primary, fontWeight: '600' }}>

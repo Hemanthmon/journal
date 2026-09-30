@@ -1,23 +1,28 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs, router } from 'expo-router';
 import { SyncIndicator } from '../../components/widgets';
+import { useSystemInsets } from '../../hooks/useSystemInsets';
 import { useTheme } from '../../lib/theme';
 import { useSession } from '../../state/session';
 
 export default function TabsLayout() {
   const status = useSession((s) => s.status);
   const { c } = useTheme();
+  const insets = useSystemInsets();
   if (status !== 'signedIn') return <Redirect href="/login" />;
 
   const headerRight = () => <SyncIndicator onPress={() => router.navigate('/profile')} />;
 
   return (
     <Tabs
+      // Keep the tab bar above the Android navigation/gesture bar and the iPhone home indicator.
+      safeAreaInsets={insets}
       screenOptions={{
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.muted,
         tabBarStyle: { backgroundColor: c.card, borderTopColor: c.border },
         headerStyle: { backgroundColor: c.bg },
+        headerStatusBarHeight: insets.top,
         headerShadowVisible: false,
         headerTintColor: c.text,
         headerRight,

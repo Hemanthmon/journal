@@ -122,6 +122,16 @@ const MIGRATIONS: string[] = [
   -- Device-only preferences (theme, reminders, privacy). Never synced.
   CREATE TABLE prefs (key TEXT PRIMARY KEY NOT NULL, value TEXT);
   `,
+  `
+  -- Personal daily reminders shown on the dashboard.
+  CREATE TABLE reminders (
+    id TEXT PRIMARY KEY NOT NULL,
+    text TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {
@@ -143,6 +153,7 @@ export const DATA_TABLES = [
   'journal_questions',
   'habits',
   'urge_records',
+  'reminders',
   'outbox',
   'conflicts',
   'sync_state',

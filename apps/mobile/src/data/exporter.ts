@@ -1,4 +1,4 @@
-import { habitProgress, weekdayName, weekdayOf } from '@journal/shared';
+import { formatTime12, habitProgress, weekdayName, weekdayOf } from '@journal/shared';
 import { listLocal, type Ctx } from './records';
 
 /**
@@ -102,7 +102,7 @@ export async function exportUrgesCsv(ctx: Ctx): Promise<string> {
       u.occurredAt,
       u.localDate,
       weekdayName(weekdayOf(u.localDate), 'long'),
-      u.localTime.slice(0, 5),
+      formatTime12(u.localTime),
       u.triggerText,
       u.intensity,
       u.actionTaken,

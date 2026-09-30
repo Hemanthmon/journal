@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { addDays, formatShortDate, toLocalDate, weekdayName, weekdayOf } from '@journal/shared';
+import { addDays, formatShortDate, formatTime12, toLocalDate, weekdayName, weekdayOf } from '@journal/shared';
 import { Body, Button, Card, Chip, EmptyState, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { DateNavigator, MiniBars, shortDay } from '../../../components/widgets';
 import { listUrges, urgeTrends } from '../../../data/urges';
@@ -30,7 +30,13 @@ export default function Urges() {
 
   return (
     <Screen>
-      <Button title="Record an urge" icon="add-circle-outline" onPress={() => router.push('/urges/new')} />
+      <Button
+        title="Having an urge? Breathe for 2 min"
+        icon="leaf-outline"
+        accessibilityHint="Starts a guided 2-minute breathing exercise"
+        onPress={() => router.push('/urges/breathe')}
+      />
+      <Button title="Record an urge" variant="secondary" icon="add-circle-outline" onPress={() => router.push('/urges/new')} />
 
       {trends.data && trends.data.total > 0 && (
         <Card>
@@ -75,7 +81,7 @@ export default function Urges() {
             <Pressable
               key={u.id}
               accessibilityRole="button"
-              accessibilityLabel={`${weekdayName(weekdayOf(u.localDate), 'long')} ${formatShortDate(u.localDate)} at ${u.localTime.slice(0, 5)}, intensity ${u.intensity}. Edit`}
+              accessibilityLabel={`${weekdayName(weekdayOf(u.localDate), 'long')} ${formatShortDate(u.localDate)} at ${formatTime12(u.localTime)}, intensity ${u.intensity}. Edit`}
               onPress={() => router.push(`/urges/${u.id}`)}
               style={({ pressed }) => ({
                 backgroundColor: c.card,
@@ -101,7 +107,7 @@ export default function Urges() {
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Body>
-                  {weekdayName(weekdayOf(u.localDate))} {formatShortDate(u.localDate)} · {u.localTime.slice(0, 5)}
+                  {weekdayName(weekdayOf(u.localDate))} {formatShortDate(u.localDate)} · {formatTime12(u.localTime)}
                 </Body>
                 <Muted numberOfLines={1}>{u.triggerText ?? u.emotionBefore ?? 'No details'}</Muted>
               </View>

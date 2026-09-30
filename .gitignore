@@ -25,3 +25,8 @@ android/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Personal data exports/imports (never commit)
+*.xlsx
+*.xls
+*.csv

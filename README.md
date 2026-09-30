@@ -35,6 +35,21 @@ npm run mobile:start   # Expo dev server; scan the QR code with Expo Go
 - If Windows asks whether Node.js may accept connections, allow it on **private networks**.
 - Android emulator: use `http://10.0.2.2:4000`. This is a phone app: the web target is not supported.
 
+### Android APK (installable app)
+
+Built in the cloud with EAS Build (free Expo account). The APK talks to the deployed API
+(`EXPO_PUBLIC_API_URL` in `apps/mobile/eas.json`).
+
+```
+cd apps/mobile
+npx eas-cli login                                  # once
+npx eas-cli build --platform android --profile preview
+```
+
+The first build asks to create the Expo project and an Android signing key; answer **yes** to both
+(EAS stores the key). When it finishes (~10–20 min) it prints a link/QR code to download the APK.
+Use `--profile production` for a Play Store bundle (.aab).
+
 ### Tests
 
 ```

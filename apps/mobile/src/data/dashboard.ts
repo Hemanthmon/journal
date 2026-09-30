@@ -1,6 +1,14 @@
-import { MOOD_SYSTEM_KEY, addDays, dailyRoutineId, dateRange, type UrgeRecord } from '@journal/shared';
+import {
+  MOOD_SYSTEM_KEY,
+  addDays,
+  dailyRoutineId,
+  dateRange,
+  type ReminderRecord,
+  type UrgeRecord,
+} from '@journal/shared';
 import { habitsForDate, type HabitForDay } from './habits';
 import { getJournalDay, isAnswered, journalCompletion } from './journal';
+import { activeReminders } from './reminders';
 import { listUrges } from './urges';
 import type { Ctx } from './records';
 
@@ -30,6 +38,25 @@ export async function moodFor(ctx: Ctx, localDate: string): Promise<number | nul
   return row?.emoji_value ?? null;
 }
 
+/** Built-in question "What's one thing you could do better tomorrow?" */
+export const TOMORROW_SYSTEM_KEY = 'tomorrow';
+
+/**
+ * What the user wrote yesterday for "What's one thing you could do better tomorrow?",
+ * to show as today's focus. Uses the built-in question, even if it was since edited.
+ */
+export async function intentionFor(ctx: Ctx, today: string): Promise<{ text: string; fromDate: string } | null> {
+  const yesterday = addDays(today, -1);
+  const row = await ctx.db.get<{ text_value: string | null }>(
+    `SELECT a.text_value FROM journal_answers a
+       JOIN journal_questions q ON q.id = a.question_id
+      WHERE a.routine_id = ? AND q.system_key = ? AND a.deleted_at IS NULL`,
+    [dailyRoutineId(ctx.userId, yesterday), TOMORROW_SYSTEM_KEY],
+  );
+  const text = row?.text_value?.trim();
+  return text ? { text, fromDate: yesterday } : null;
+}
+
 export interface WeekDay {
   localDate: string;
   habitPercent: number | null;
@@ -43,15 +70,19 @@ export interface Dashboard {
   journal: { answered: number; total: number; mood: number | null };
   urges: { todayCount: number; recent: UrgeRecord[] };
   week: WeekDay[];
+  reminders: ReminderRecord[];
+  intention: { text: string; fromDate: string } | null;
 }
 
 export async function loadDashboard(ctx: Ctx, today: string): Promise<Dashboard> {
-  const [habits, journalDay, mood, todayUrges, recent] = await Promise.all([
+  const [habits, journalDay, mood, todayUrges, recent, reminders, intention] = await Promise.all([
     habitDaySummary(ctx, today),
     getJournalDay(ctx, today),
     moodFor(ctx, today),
     listUrges(ctx, { from: today, to: today }),
     listUrges(ctx, { from: addDays(today, -6), to: today }),
+    activeReminders(ctx),
+    intentionFor(ctx, today),
   ]);
   const { answered, total } = journalCompletion(journalDay);
 
@@ -72,6 +103,8 @@ export async function loadDashboard(ctx: Ctx, today: string): Promise<Dashboard>
     journal: { answered, total, mood },
     urges: { todayCount: todayUrges.length, recent: recent.slice(0, 3) },
     week,
+    reminders,
+    intention,
   };
 }
 

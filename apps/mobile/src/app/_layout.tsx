@@ -2,7 +2,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Body, Button, Loading, Screen } from '../components/ui';
 import { queryClient } from '../lib/queryClient';
 import { useTheme } from '../lib/theme';
@@ -20,24 +19,24 @@ export default function RootLayout() {
   };
   useEffect(start, [bootstrap]);
 
+  // Expo Router already provides the SafeAreaProvider (with correct initial metrics);
+  // adding another one here made nested views measure insets on their own.
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style={dark ? 'light' : 'dark'} />
-        {error ? (
-          <Screen edges={['top']}>
-            <Body>{error}</Body>
-            <Button title="Try again" onPress={start} />
-          </Screen>
-        ) : status === 'loading' ? (
-          <Loading />
-        ) : (
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(auth)" />
-          </Stack>
-        )}
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <StatusBar style={dark ? 'light' : 'dark'} />
+      {error ? (
+        <Screen edges={['top', 'bottom']}>
+          <Body>{error}</Body>
+          <Button title="Try again" onPress={start} />
+        </Screen>
+      ) : status === 'loading' ? (
+        <Loading />
+      ) : (
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(auth)" />
+        </Stack>
+      )}
+    </QueryClientProvider>
   );
 }

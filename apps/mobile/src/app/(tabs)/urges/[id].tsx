@@ -3,16 +3,19 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 import {
+  from12Hour,
   localDateSchema,
-  localTimeSchema,
+  to12Hour,
   toLocalDate,
   toLocalTime,
   weekdayName,
   weekdayOf,
+  type Meridiem,
 } from '@journal/shared';
 import { describeError } from '../../../api/client';
 import { Body, Button, Card, Chip, ErrorNote, Field, Loading, Muted, Screen, Segmented } from '../../../components/ui';
 import { createUrge, deleteUrge, getUrge, updateUrge, type UrgeDraft } from '../../../data/urges';
+import { EMOTIONS, EMOTION_MAX_LENGTH, formatEmotions, parseEmotions } from '../../../lib/emotions';
 import { space } from '../../../lib/theme';
 import { useCtx } from '../../../state/session';
 
@@ -27,7 +30,7 @@ const YES_NO = [
 
 export default function UrgeForm() {
   const ctx = useCtx();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const isNew = id === 'new';
   const existing = useQuery({
     queryKey: ['urge', id],
@@ -37,11 +40,14 @@ export default function UrgeForm() {
 
   const now = new Date();
   const [date, setDate] = useState(toLocalDate(now));
-  const [time, setTime] = useState(toLocalTime(now));
+  // Times are entered in 12-hour form with AM/PM and stored as 24-hour "HH:MM".
+  const [time, setTime] = useState(to12Hour(toLocalTime(now)).time);
+  const [period, setPeriod] = useState<Meridiem>(to12Hour(toLocalTime(now)).period);
   const [intensity, setIntensity] = useState<number | null>(null);
   const [trigger, setTrigger] = useState('');
-  const [emotion, setEmotion] = useState('');
-  const [action, setAction] = useState('');
+  const [emotions, setEmotions] = useState<string[]>([]);
+  const [otherEmotion, setOtherEmotion] = useState('');
+  const [action, setAction] = useState(isNew && from === 'breathing' ? 'Did a 2-minute breathing exercise' : '');
   const [outcome, setOutcome] = useState('');
   const [masturbated, setMasturbated] = useState<YesNo>('unset');
   const [explicit, setExplicit] = useState<YesNo>('unset');
@@ -53,10 +59,14 @@ export default function UrgeForm() {
     const u = existing.data;
     if (!u) return;
     setDate(u.localDate);
-    setTime(u.localTime.slice(0, 5));
+    const t = to12Hour(u.localTime);
+    setTime(t.time);
+    setPeriod(t.period);
     setIntensity(u.intensity);
     setTrigger(u.triggerText ?? '');
-    setEmotion(u.emotionBefore ?? '');
+    const parsed = parseEmotions(u.emotionBefore);
+    setEmotions(parsed.selected);
+    setOtherEmotion(parsed.other);
     setAction(u.actionTaken ?? '');
     setOutcome(u.outcome ?? '');
     setMasturbated(toYesNo(u.masturbated));
@@ -67,18 +77,19 @@ export default function UrgeForm() {
   if (!isNew && existing.isLoading) return <Loading />;
 
   const dateOk = localDateSchema.safeParse(date).success;
-  const timeOk = localTimeSchema.safeParse(time).success;
+  const time24 = from12Hour(time, period);
+  const timeOk = time24 !== null;
 
   const save = async () => {
     setError(null);
     if (intensity === null) return setError('Choose an intensity from 0 to 10.');
-    if (!dateOk || !timeOk) return setError('Check the date (YYYY-MM-DD) and time (HH:MM).');
+    if (!dateOk || !time24) return setError('Check the date (YYYY-MM-DD) and time (e.g. 9:30 PM).');
     const draft: UrgeDraft = {
       localDate: date,
-      localTime: time,
+      localTime: time24,
       intensity,
       triggerText: trigger,
-      emotionBefore: emotion,
+      emotionBefore: formatEmotions(emotions, otherEmotion),
       actionTaken: action,
       outcome,
       masturbated: fromYesNo(masturbated),
@@ -127,12 +138,21 @@ export default function UrgeForm() {
             />
           ))}
         </View>
-        <View style={{ flexDirection: 'row', gap: space.md }}>
+        <Field label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" error={dateOk ? null : 'Use YYYY-MM-DD'} />
+        <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
-            <Field label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" error={dateOk ? null : 'Use YYYY-MM-DD'} />
+            <Field
+              label="Time"
+              value={time}
+              onChangeText={setTime}
+              placeholder="9:30"
+              keyboardType="numbers-and-punctuation"
+              error={timeOk ? null : 'Use h:mm, e.g. 9:30'}
+            />
           </View>
-          <View style={{ flex: 1 }}>
-            <Field label="Time" value={time} onChangeText={setTime} placeholder="HH:MM" error={timeOk ? null : 'Use HH:MM'} />
+          <View accessibilityRole="radiogroup" accessibilityLabel="AM or PM" style={{ flexDirection: 'row', gap: space.sm, paddingTop: 22 }}>
+            <Chip label="AM" selected={period === 'AM'} onPress={() => setPeriod('AM')} />
+            <Chip label="PM" selected={period === 'PM'} onPress={() => setPeriod('PM')} />
           </View>
         </View>
         <Muted>{dateOk ? `Day: ${weekdayName(weekdayOf(date), 'long')}` : ' '}</Muted>
@@ -144,7 +164,9 @@ export default function UrgeForm() {
             onPress={() => {
               const n = new Date();
               setDate(toLocalDate(n));
-              setTime(toLocalTime(n));
+              const t = to12Hour(toLocalTime(n));
+              setTime(t.time);
+              setPeriod(t.period);
             }}
           />
         )}
@@ -152,7 +174,28 @@ export default function UrgeForm() {
 
       <Card>
         <Field label="Trigger" value={trigger} onChangeText={setTrigger} placeholder="What set it off?" />
-        <Field label="Emotion felt before the urge" value={emotion} onChangeText={setEmotion} placeholder="e.g. bored, lonely, stressed" />
+        <Body style={{ fontWeight: '600' }}>Emotion felt before the urge</Body>
+        <Muted>Tap all that apply.</Muted>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          {EMOTIONS.map((e) => {
+            const on = emotions.includes(e);
+            return (
+              <Chip
+                key={e}
+                label={e}
+                selected={on}
+                onPress={() => setEmotions((cur) => (on ? cur.filter((x) => x !== e) : [...cur, e]))}
+              />
+            );
+          })}
+        </View>
+        <Field
+          label="Other (optional)"
+          value={otherEmotion}
+          onChangeText={setOtherEmotion}
+          placeholder="Anything else you felt"
+          maxLength={EMOTION_MAX_LENGTH - 40}
+        />
         <Field label="What did I do?" value={action} onChangeText={setAction} multiline />
         <Field label="What happened after the urge?" value={outcome} onChangeText={setOutcome} multiline />
       </Card>
