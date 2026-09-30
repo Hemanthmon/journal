@@ -43,6 +43,7 @@ export function urgesRouter(): Router {
       }
       const now = new Date().toISOString();
       const urge = await saveRecord(conn, userId, 'urges', {
+        durationMinutes: null,
         triggerText: null,
         actionTaken: null,
         outcome: null,

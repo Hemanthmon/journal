@@ -110,3 +110,15 @@ describe('habit measurements', () => {
     expect(disabled.isActive).toBe(false);
   });
 });
+
+describe('urge duration (local)', () => {
+  it('stores an optional duration and keeps it through edits', async () => {
+    const { createUrge, updateUrge, getUrge } = await import('./urges');
+    const u = await createUrge(ctx, { localDate: '2026-09-29', localTime: '21:00', intensity: 5, durationMinutes: 15 });
+    expect(u.durationMinutes).toBe(15);
+    await updateUrge(ctx, u.id, { intensity: 3 });
+    expect((await getUrge(ctx, u.id))?.durationMinutes).toBe(15);
+    const none = await createUrge(ctx, { localDate: '2026-09-29', localTime: '22:00', intensity: 2 });
+    expect(none.durationMinutes).toBeNull();
+  });
+});

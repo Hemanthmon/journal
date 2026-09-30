@@ -2,9 +2,15 @@ import { createApp } from './app';
 import { config } from './config/env';
 import { closePool } from './db/pool';
 import { describeError, logger } from './lib/logger';
+import { syncEnvAccess } from './modules/dashboard/access';
 
 const server = createApp().listen(config.port, () => {
   logger.info('api_started', { port: config.port, env: config.nodeEnv });
+  // Apply DASHBOARD_VIEWER_EMAIL / DASHBOARD_OWNER_EMAIL to the access table.
+  syncEnvAccess().then(
+    () => logger.info('dashboard_access_synced', { enabled: config.dashboard.enabled }),
+    (err: unknown) => logger.error('dashboard_access_sync_failed', describeError(err)),
+  );
 });
 
 function shutdown(signal: string) {

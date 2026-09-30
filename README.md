@@ -6,6 +6,7 @@ A private, offline-first app for daily habits, journaling and urge tracking.
 packages/shared   Zod schemas, types, sync protocol, date/progress utilities (used by both apps)
 apps/api          Node + Express + MySQL REST API
 apps/mobile       Expo (React Native) app with local SQLite and background sync
+apps/web          Read-only web dashboard (React + Vite), served by the API from the same origin
 ```
 
 ## Running it
@@ -49,6 +50,23 @@ npx eas-cli build --platform android --profile preview
 The first build asks to create the Expo project and an Android signing key; answer **yes** to both
 (EAS stores the key). When it finishes (~10–20 min) it prints a link/QR code to download the APK.
 Use `--profile production` for a Play Store bundle (.aab).
+
+### Web dashboard (read-only viewer)
+
+A second person (the *viewer*) can see one user's (the *owner's*) records in a browser, but only
+after the owner grants access, and never change them.
+
+1. In `apps/api/.env` set `DASHBOARD_VIEWER_EMAIL`, `DASHBOARD_OWNER_EMAIL` (the owner's app
+   account) and a random `DASHBOARD_SESSION_SECRET` (32+ characters, different from the JWT secret).
+   For real email delivery set `MAIL_PROVIDER=brevo`, `BREVO_API_KEY` and `MAIL_FROM_EMAIL`; in
+   development `MAIL_PROVIDER=console` prints the sign-in code to the API log.
+2. Development: `npm run api:dev` and `npm run dev -w @journal/web`, then open http://localhost:5173.
+   Production: `npm run build -w @journal/web`; the API serves `apps/web/dist` itself.
+3. The viewer enters their email, receives a 6-digit code (valid 10 minutes, 5 attempts, single use)
+   and gets a 12-hour HttpOnly session cookie.
+
+**Revoking access:** clear `DASHBOARD_VIEWER_EMAIL` (or change it) and restart the API. The grant row
+in `dashboard_access` is marked revoked, and every open session stops working on its next request.
 
 ### Tests
 
@@ -104,6 +122,8 @@ or `{ error: { code, message, details? } }`.
 | Daily routines | `GET /api/daily-routines?from&to`, `GET/PUT /api/daily-routines/:date` |
 | Urges | `GET/POST /api/urges`, `GET/PATCH/DELETE /api/urges/:id` |
 | Sync | `POST /api/sync/push`, `GET /api/sync/pull?cursor&limit` |
+| Dashboard login | `POST /api/dashboard/auth/request-code`, `/verify-code`, `/logout` |
+| Dashboard (read-only, cookie session) | `GET /api/dashboard/me`, `/overview`, `/habits`, `/habits/:id`, `/days`, `/days/:date`, `/urges`, `/export.xlsx` — all take `?from&to` |
 
 The app itself only uses auth, profile, account and sync. The CRUD routes share the same write path
 (`apps/api/src/records/records.ts`), so they apply the same validation and conflict rules.

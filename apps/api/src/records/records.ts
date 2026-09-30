@@ -188,6 +188,11 @@ export async function applyRecord<E extends EntityName>(
   }
 
   if (existing) {
+    // Optional fields missing from the input (older app versions don't know them) keep
+    // their stored value instead of being cleared.
+    for (const fd of def.fields) {
+      if (rec[fd.field] === undefined) rec[fd.field] = (existing as Record<string, unknown>)[fd.field];
+    }
     if (sameContent(entity, existing, rec)) {
       return { status: 'applied', serverSeq: existing.serverSeq, changed: false };
     }

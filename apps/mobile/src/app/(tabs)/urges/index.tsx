@@ -108,6 +108,7 @@ export default function Urges() {
               <View style={{ flex: 1, gap: 2 }}>
                 <Body>
                   {weekdayName(weekdayOf(u.localDate))} {formatShortDate(u.localDate)} · {formatTime12(u.localTime)}
+                  {u.durationMinutes != null ? ` · ${u.durationMinutes} min` : ''}
                 </Body>
                 <Muted numberOfLines={1}>{u.triggerText ?? u.emotionBefore ?? 'No details'}</Muted>
               </View>

@@ -131,6 +131,7 @@ export const ENTITIES = {
       f('localTime', 'local_time', 'time'),
       f('triggerText', 'trigger_text', 'string'),
       f('intensity', 'intensity', 'number'),
+      f('durationMinutes', 'duration_minutes', 'number'),
       f('actionTaken', 'action_taken', 'string'),
       f('outcome', 'outcome', 'string'),
       f('emotionBefore', 'emotion_before', 'string'),

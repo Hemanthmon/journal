@@ -141,6 +141,10 @@ const MIGRATIONS: string[] = [
     ${SYNC_COLUMNS}
   );
   `,
+  `
+  -- How long an urge lasted, in minutes (NULL = not recorded).
+  ALTER TABLE urge_records ADD COLUMN duration_minutes INTEGER;
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {

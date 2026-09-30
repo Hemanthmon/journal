@@ -5,6 +5,7 @@ export interface UrgeDraft {
   localDate: string;
   localTime: string;
   intensity: number;
+  durationMinutes?: number | null;
   triggerText?: string | null;
   actionTaken?: string | null;
   outcome?: string | null;
@@ -41,6 +42,7 @@ export async function getUrge(ctx: Ctx, id: string): Promise<UrgeRecord | undefi
 export function createUrge(ctx: Ctx, draft: UrgeDraft): Promise<UrgeRecord> {
   const now = ctx.now().toISOString();
   return writeLocal(ctx, 'urges', {
+    durationMinutes: null,
     triggerText: null,
     actionTaken: null,
     outcome: null,

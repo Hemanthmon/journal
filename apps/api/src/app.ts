@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
@@ -7,6 +9,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestLogger, requireHttps } from './middleware/security';
 import { accountRouter } from './modules/account/routes';
 import { authRouter } from './modules/auth/routes';
+import { dashboardRouter } from './modules/dashboard/routes';
 import { dailyRoutinesRouter } from './modules/dailyRoutines/routes';
 import { habitLogsRouter } from './modules/habitLogs/routes';
 import { habitsRouter } from './modules/habits/routes';
@@ -51,6 +54,21 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/daily-routines', authenticate, dailyRoutinesRouter());
   app.use('/api/urges', authenticate, urgesRouter());
   app.use('/api/sync', authenticate, syncRouter());
+
+  // Read-only web dashboard API (its own email-code sessions; see modules/dashboard).
+  app.use('/api/dashboard', dashboardRouter({ rateLimitMax: opts.authRateLimitMax ?? config.auth.rateLimitMax }));
+
+  // The dashboard web app (apps/web) is served from the same origin as the API, so its
+  // session cookie is first-party and SameSite=Strict, and no CORS is needed.
+  const webDist = path.resolve(__dirname, '../../web/dist');
+  if (existsSync(path.join(webDist, 'index.html'))) {
+    app.use(express.static(webDist, { index: false, maxAge: '1h' }));
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(webDist, 'index.html'));
+    });
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

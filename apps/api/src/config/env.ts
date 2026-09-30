@@ -35,6 +35,19 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default(''),
   TRUST_PROXY: boolish,
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+
+  // Read-only web dashboard. The viewer logs in with an emailed one-time code and sees the
+  // owner's records. Leave the emails empty to disable dashboard access.
+  DASHBOARD_VIEWER_EMAIL: z.string().trim().toLowerCase().default(''),
+  DASHBOARD_OWNER_EMAIL: z.string().trim().toLowerCase().default(''),
+  DASHBOARD_SESSION_SECRET: z.string().default(''),
+  DASHBOARD_SESSION_HOURS: z.coerce.number().int().min(1).max(168).default(12),
+  // How login codes are delivered: 'brevo' (HTTPS email API; SMTP is blocked on Render's
+  // free plan) or 'console' (development/test only: printed to the server log).
+  MAIL_PROVIDER: z.enum(['brevo', 'console']).default('console'),
+  BREVO_API_KEY: z.string().default(''),
+  MAIL_FROM_EMAIL: z.string().default(''),
+  MAIL_FROM_NAME: z.string().default('Journal'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -47,6 +60,22 @@ const env = parsed.data;
 
 if (env.NODE_ENV === 'production' && env.BCRYPT_ROUNDS < 12) {
   throw new Error('BCRYPT_ROUNDS must be at least 12 in production');
+}
+
+const dashboardEnabled = !!env.DASHBOARD_VIEWER_EMAIL && !!env.DASHBOARD_OWNER_EMAIL;
+if (dashboardEnabled) {
+  if (env.DASHBOARD_SESSION_SECRET.length < 32) {
+    throw new Error('DASHBOARD_SESSION_SECRET must be at least 32 characters when the dashboard is enabled');
+  }
+  if (env.DASHBOARD_SESSION_SECRET === env.JWT_ACCESS_SECRET) {
+    throw new Error('DASHBOARD_SESSION_SECRET must differ from JWT_ACCESS_SECRET');
+  }
+  if (env.NODE_ENV === 'production' && env.MAIL_PROVIDER === 'console') {
+    throw new Error('MAIL_PROVIDER=console is not allowed in production (login codes would be logged)');
+  }
+  if (env.MAIL_PROVIDER === 'brevo' && (!env.BREVO_API_KEY || !env.MAIL_FROM_EMAIL)) {
+    throw new Error('MAIL_PROVIDER=brevo needs BREVO_API_KEY and MAIL_FROM_EMAIL');
+  }
 }
 
 /**
@@ -89,6 +118,19 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   trustProxy: env.TRUST_PROXY,
+  dashboard: {
+    enabled: dashboardEnabled,
+    viewerEmail: env.DASHBOARD_VIEWER_EMAIL,
+    ownerEmail: env.DASHBOARD_OWNER_EMAIL,
+    sessionSecret: env.DASHBOARD_SESSION_SECRET,
+    sessionHours: env.DASHBOARD_SESSION_HOURS,
+  },
+  mail: {
+    provider: env.MAIL_PROVIDER,
+    brevoApiKey: env.BREVO_API_KEY,
+    fromEmail: env.MAIL_FROM_EMAIL,
+    fromName: env.MAIL_FROM_NAME,
+  },
 } as const;
 
 export type AppConfig = typeof config;

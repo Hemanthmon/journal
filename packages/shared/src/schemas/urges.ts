@@ -17,6 +17,18 @@ const urgeFields = {
   localTime: localTimeSchema,
   triggerText: optionalText(1000),
   intensity: z.number().int().min(0, 'Intensity is 0–10').max(10, 'Intensity is 0–10'),
+  /**
+   * How long the urge lasted, in whole minutes; null = not recorded. Optional on the wire
+   * so app versions from before this field can still sync (the server keeps the stored
+   * value when a record arrives without it).
+   */
+  durationMinutes: z
+    .number()
+    .int('Duration must be whole minutes')
+    .min(0, 'Duration is 0–1440 minutes')
+    .max(1440, 'Duration is 0–1440 minutes')
+    .nullable()
+    .optional(),
   actionTaken: optionalText(10_000),
   outcome: optionalText(10_000),
   emotionBefore: optionalText(255),
@@ -38,6 +50,7 @@ export const createUrgeSchema = z
     localTime: urgeFields.localTime,
     triggerText: urgeFields.triggerText.optional(),
     intensity: urgeFields.intensity,
+    durationMinutes: urgeFields.durationMinutes,
     actionTaken: urgeFields.actionTaken.optional(),
     outcome: urgeFields.outcome.optional(),
     emotionBefore: urgeFields.emotionBefore.optional(),
@@ -55,6 +68,7 @@ export const updateUrgeSchema = z
     localTime: urgeFields.localTime.optional(),
     triggerText: urgeFields.triggerText.optional(),
     intensity: urgeFields.intensity.optional(),
+    durationMinutes: urgeFields.durationMinutes,
     actionTaken: urgeFields.actionTaken.optional(),
     outcome: urgeFields.outcome.optional(),
     emotionBefore: urgeFields.emotionBefore.optional(),
