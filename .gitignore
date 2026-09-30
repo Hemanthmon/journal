@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Secrets — never commit real env files
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# Expo
+.expo/
+web-build/
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json

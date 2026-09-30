@@ -1,0 +1,43 @@
+import { create } from 'zustand';
+import type { Db } from '../db/types';
+
+/** Device-only preferences, stored in the local `prefs` table (never synced). */
+export interface Prefs {
+  theme: 'system' | 'light' | 'dark';
+  reminderEnabled: boolean;
+  reminderTime: string; // HH:MM
+  showUrgesOnDashboard: boolean;
+}
+
+const DEFAULTS: Prefs = {
+  theme: 'system',
+  reminderEnabled: false,
+  reminderTime: '21:00',
+  showUrgesOnDashboard: true,
+};
+
+let prefsDb: Db | null = null;
+
+export const usePrefs = create<Prefs & { set: (patch: Partial<Prefs>) => Promise<void> }>((set, get) => ({
+  ...DEFAULTS,
+  set: async (patch) => {
+    set(patch);
+    if (!prefsDb) return;
+    const { set: _s, ...all } = get();
+    await prefsDb.run(
+      "INSERT INTO prefs (key, value) VALUES ('prefs', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      [JSON.stringify(all)],
+    );
+  },
+}));
+
+export async function loadPrefs(db: Db) {
+  prefsDb = db;
+  const row = await db.get<{ value: string }>("SELECT value FROM prefs WHERE key = 'prefs'");
+  if (!row) return;
+  try {
+    usePrefs.setState({ ...DEFAULTS, ...(JSON.parse(row.value) as Partial<Prefs>) });
+  } catch {
+    // Ignore corrupt prefs; defaults apply.
+  }
+}

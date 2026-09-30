@@ -1,0 +1,24 @@
+{
+  "name": "journal",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @journal/shared",
+    "api:dev": "npm run dev -w @journal/api",
+    "api:migrate": "npm run migrate -w @journal/api",
+    "api:test": "npm run test -w @journal/api",
+    "mobile:start": "npm run build:shared && npm run start -w @journal/mobile",
+    "mobile:test": "npm run build:shared && npm run test -w @journal/mobile",
+    "test": "npm run api:test && npm run mobile:test",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "react": "19.2.3"
+  }
+}

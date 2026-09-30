@@ -1,0 +1,55 @@
+# Render Blueprint for the API (https://render.com/docs/blueprint-spec).
+# In the Render dashboard: New → Blueprint → pick this repository. Render will ask for the
+# values marked `sync: false` (database connection); never commit them.
+services:
+  - type: web
+    name: journal-api
+    runtime: node
+    plan: free
+    # Install only the API and shared packages (not the Expo app). Dev dependencies are
+    # needed to compile TypeScript, so include them even though NODE_ENV=production.
+    buildCommand: npm ci --include=dev --workspace=@journal/shared --workspace=@journal/api && npm run build -w @journal/api
+    # Apply pending database migrations, then start. (Pre-deploy commands aren't available
+    # on the free plan; the migration runner is idempotent and takes a lock.)
+    startCommand: node apps/api/dist/db/migrate-cli.js && node apps/api/dist/server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    # Only redeploy when backend code changes, not on mobile-app commits.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/shared/**
+        - package.json
+        - package-lock.json
+        - render.yaml
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Render terminates TLS; trust its X-Forwarded-Proto so HTTPS enforcement works.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: journal
+      - key: DB_SSL
+        value: "1"
+      # Aiven's CA certificate (public, committed at apps/api/certs/ca.pem).
+      - key: DB_SSL_CA_PATH
+        value: certs/ca.pem
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: AUTH_RATE_LIMIT_MAX
+        value: "10"
+      - key: CORS_ORIGINS
+        value: ""
