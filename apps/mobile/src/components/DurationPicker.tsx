@@ -27,11 +27,13 @@ function Wheel({
   value,
   onChange,
   unit,
+  format = (v) => String(v).padStart(2, '0'),
 }: {
   values: number[];
   value: number;
   onChange: (v: number) => void;
   unit: string;
+  format?: (v: number) => string;
 }) {
   const { c } = useTheme();
   const ref = useRef<ScrollView>(null);
@@ -85,7 +87,7 @@ function Wheel({
           }}
           contentContainerStyle={{ paddingVertical: ITEM * Math.floor(VISIBLE / 2) }}
           accessibilityRole="adjustable"
-          accessibilityLabel={`${unit}: ${live}`}
+          accessibilityLabel={`${unit}: ${format(live)}`}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(e) => {
             const i = values.indexOf(live) + (e.nativeEvent.actionName === 'increment' ? 1 : -1);
@@ -116,7 +118,7 @@ function Wheel({
                     fontVariant: ['tabular-nums'],
                   }}
                 >
-                  {String(v).padStart(2, '0')}
+                  {format(v)}
                 </Text>
               </Pressable>
             );
@@ -196,36 +198,17 @@ export function DurationPicker({
               How long did the urge last?
             </Text>
 
-            {/* Quick choice for very short urges: saves 0 minutes, shown as "Under 1 min". */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: value === 0 }}
-              onPress={() => {
-                onChange(0);
-                close();
-              }}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: space.sm,
-                minHeight: 48,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: value === 0 ? c.primary : c.border,
-                backgroundColor: value === 0 ? c.primarySoft : c.cardAlt,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Ionicons name="flash-outline" size={18} color={c.primary} />
-              <Text style={{ color: c.primary, fontSize: font.body, fontWeight: '600' }}>Less than a minute</Text>
-            </Pressable>
-            <Text style={{ color: c.muted, fontSize: font.small, textAlign: 'center' }}>or pick hours and minutes</Text>
-
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Wheel values={HOURS} value={h} onChange={setH} unit="Hours" />
               <Text style={{ color: c.text, fontSize: 26, fontWeight: '700', marginTop: space.lg }}>:</Text>
-              <Wheel values={MINUTES} value={m} onChange={setM} unit="Minutes" />
+              <Wheel
+                values={MINUTES}
+                value={m}
+                onChange={setM}
+                unit="Minutes"
+                // With 0 hours, the first minute is "<1": the urge lasted under a minute.
+                format={(v) => (v === 0 && h === 0 ? '<1' : String(v).padStart(2, '0'))}
+              />
             </View>
 
             <Text style={{ color: c.muted, fontSize: font.body, textAlign: 'center' }}>
