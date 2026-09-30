@@ -384,7 +384,8 @@ export function ErrorNote({ message }: { message: string }) {
 }
 
 export const styles = StyleSheet.create({
-  screenContent: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl * 2 },
+  // Extra bottom room so the last card can scroll clear of the floating breathe button.
+  screenContent: { padding: space.lg, gap: space.lg, paddingBottom: 104 },
   card: { borderRadius: radius.lg, padding: space.lg, gap: space.md, borderWidth: StyleSheet.hairlineWidth },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   button: {

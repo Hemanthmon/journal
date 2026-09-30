@@ -20,6 +20,10 @@ export const habitLogId = (userId: string, habitId: string, localDate: string) =
 export const journalAnswerId = (userId: string, localDate: string, questionId: string) =>
   uuidv5(`${userId}:answer:${localDate}:${questionId}`, APP_NAMESPACE);
 
+/** Id for a built-in emotion option, identical on every device for the same user. */
+export const defaultEmotionId = (userId: string, name: string) =>
+  uuidv5(`${userId}:emotion:${name.toLowerCase()}`, APP_NAMESPACE);
+
 export function uuidv5(name: string, namespace: string): string {
   const ns = parseUuid(namespace);
   const nameBytes = utf8(name);

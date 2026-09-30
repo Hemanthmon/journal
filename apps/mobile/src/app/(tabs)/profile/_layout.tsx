@@ -33,6 +33,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="questions/[id]" options={{ title: 'Question' }} />
       <Stack.Screen name="reminders/index" options={{ title: 'Daily reminders' }} />
       <Stack.Screen name="reminders/[id]" options={{ title: 'Edit reminder' }} />
+      <Stack.Screen name="emotions" options={{ title: 'Manage emotions' }} />
       <Stack.Screen name="history" options={{ title: 'Daily routine history' }} />
       <Stack.Screen name="habit-history" options={{ title: 'Habit history' }} />
       <Stack.Screen name="conflicts" options={{ title: 'Resolve edits' }} />

@@ -6,6 +6,7 @@ export * from './schemas/habits';
 export * from './schemas/questions';
 export * from './schemas/urges';
 export * from './schemas/reminders';
+export * from './schemas/emotions';
 export * from './schemas/sync';
 export * from './entities';
 export * from './schedule';

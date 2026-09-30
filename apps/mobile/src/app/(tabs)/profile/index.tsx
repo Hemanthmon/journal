@@ -125,6 +125,11 @@ export default function Profile() {
       </Card>
 
       <Card>
+        <SectionTitle>Urge Tracker Settings</SectionTitle>
+        <LinkRow icon="happy-outline" label="Manage emotions" onPress={() => router.push('/profile/emotions')} />
+      </Card>
+
+      <Card>
         <SectionTitle>History</SectionTitle>
         <LinkRow icon="calendar-outline" label="Daily routine history" onPress={() => router.push('/profile/history')} />
         <LinkRow icon="stats-chart-outline" label="Habit history" onPress={() => router.push('/profile/habit-history')} />

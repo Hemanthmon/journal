@@ -273,6 +273,29 @@ describe('reminders', () => {
   });
 });
 
+describe('emotion options', () => {
+  it('merge default emotions created on two devices and keep removed ones removed', async () => {
+    const { auth, userId } = await setup();
+    const { defaultEmotionId } = await import('@journal/shared');
+    const base = (await pull(auth)).nextCursor;
+    const now = iso();
+    const bored = { id: defaultEmotionId(userId, 'Bored'), createdAt: now, updatedAt: now, deletedAt: null, name: 'Bored', displayOrder: 0 };
+
+    // Phone and tablet both create the default: one record, second is a no-op.
+    const phone = await push(auth, [change('emotionOptions', bored)]);
+    const tablet = await push(auth, [change('emotionOptions', { ...bored, updatedAt: iso(500) })]);
+    expect(tablet.body.data.results[0]).toMatchObject({ status: 'applied', serverSeq: phone.body.data.results[0].serverSeq });
+
+    // Removed on the phone; a device re-creating the default later can't bring it back.
+    await push(auth, [change('emotionOptions', { ...bored, deletedAt: iso(1000), updatedAt: iso(1000) })]);
+    const recreate = await push(auth, [change('emotionOptions', { ...bored, updatedAt: iso(5000) })]);
+    expect(recreate.body.data.results[0]).toMatchObject({ status: 'stale', record: { deletedAt: expect.any(String) } });
+
+    const pulled = await pull(auth, base);
+    expect(pulled.changes.filter((c) => c.entity === 'emotionOptions')).toHaveLength(1);
+  });
+});
+
 describe('account data deletion', () => {
   it('deletes personal data, bumps the epoch, and makes old devices re-download', async () => {
     const { auth, password } = await setup();

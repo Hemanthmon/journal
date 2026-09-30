@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import {
   from12Hour,
@@ -15,7 +15,8 @@ import {
 import { describeError } from '../../../api/client';
 import { Body, Button, Card, Chip, ErrorNote, Field, Loading, Muted, Screen, Segmented } from '../../../components/ui';
 import { createUrge, deleteUrge, getUrge, updateUrge, type UrgeDraft } from '../../../data/urges';
-import { EMOTIONS, EMOTION_MAX_LENGTH, formatEmotions, parseEmotions } from '../../../lib/emotions';
+import { listEmotions } from '../../../data/emotions';
+import { EMOTION_MAX_LENGTH, formatEmotions, parseEmotions } from '../../../lib/emotions';
 import { space } from '../../../lib/theme';
 import { useCtx } from '../../../state/session';
 
@@ -37,6 +38,10 @@ export default function UrgeForm() {
     queryFn: () => getUrge(ctx, id),
     enabled: !isNew,
   });
+  // The user's own emotion chips (Profile → Manage emotions).
+  const emotionList = useQuery({ queryKey: ['emotions'], queryFn: () => listEmotions(ctx) });
+  const emotionOptions = emotionList.data?.map((e) => e.name) ?? [];
+  const loadedRecord = useRef(false);
 
   const now = new Date();
   const [date, setDate] = useState(toLocalDate(now));
@@ -57,14 +62,16 @@ export default function UrgeForm() {
 
   useEffect(() => {
     const u = existing.data;
-    if (!u) return;
+    // Fill the form once, when both the record and the emotion list are available.
+    if (!u || !emotionList.data || loadedRecord.current) return;
+    loadedRecord.current = true;
     setDate(u.localDate);
     const t = to12Hour(u.localTime);
     setTime(t.time);
     setPeriod(t.period);
     setIntensity(u.intensity);
     setTrigger(u.triggerText ?? '');
-    const parsed = parseEmotions(u.emotionBefore);
+    const parsed = parseEmotions(u.emotionBefore, emotionList.data.map((e) => e.name));
     setEmotions(parsed.selected);
     setOtherEmotion(parsed.other);
     setAction(u.actionTaken ?? '');
@@ -72,9 +79,9 @@ export default function UrgeForm() {
     setMasturbated(toYesNo(u.masturbated));
     setExplicit(toYesNo(u.explicitContent));
     setRemarks(u.remarks ?? '');
-  }, [existing.data]);
+  }, [existing.data, emotionList.data]);
 
-  if (!isNew && existing.isLoading) return <Loading />;
+  if ((!isNew && existing.isLoading) || emotionList.isLoading) return <Loading />;
 
   const dateOk = localDateSchema.safeParse(date).success;
   const time24 = from12Hour(time, period);
@@ -89,7 +96,7 @@ export default function UrgeForm() {
       localTime: time24,
       intensity,
       triggerText: trigger,
-      emotionBefore: formatEmotions(emotions, otherEmotion),
+      emotionBefore: formatEmotions(emotions, otherEmotion, emotionOptions),
       actionTaken: action,
       outcome,
       masturbated: fromYesNo(masturbated),
@@ -175,9 +182,9 @@ export default function UrgeForm() {
       <Card>
         <Field label="Trigger" value={trigger} onChangeText={setTrigger} placeholder="What set it off?" />
         <Body style={{ fontWeight: '600' }}>Emotion felt before the urge</Body>
-        <Muted>Tap all that apply.</Muted>
+        <Muted>Tap all that apply. Edit this list in Profile → Manage emotions.</Muted>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {EMOTIONS.map((e) => {
+          {emotionOptions.map((e) => {
             const on = emotions.includes(e);
             return (
               <Chip

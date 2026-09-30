@@ -8,6 +8,7 @@ import {
   type JournalAnswerRecord,
   type JournalQuestionRecord,
 } from './schemas/questions';
+import { emotionOptionRecordSchema, type EmotionOptionRecord } from './schemas/emotions';
 import { reminderRecordSchema, type ReminderRecord } from './schemas/reminders';
 import { urgeRecordSchema, type UrgeRecord } from './schemas/urges';
 
@@ -151,6 +152,13 @@ export const ENTITIES = {
     schema: reminderRecordSchema,
     stickyDelete: true,
   },
+  emotionOptions: {
+    table: 'emotion_options',
+    fields: [...BASE_FIELDS, f('name', 'name', 'string'), f('displayOrder', 'display_order', 'number')],
+    schema: emotionOptionRecordSchema,
+    // A default emotion the user removed must not come back from another device.
+    stickyDelete: true,
+  },
 } satisfies Record<string, EntityDef>;
 
 export type EntityName = keyof typeof ENTITIES;
@@ -164,6 +172,7 @@ export const ENTITY_ORDER: EntityName[] = [
   'journalAnswers',
   'urges',
   'reminders',
+  'emotionOptions',
 ];
 
 export interface EntityRecordMap {
@@ -174,6 +183,7 @@ export interface EntityRecordMap {
   journalAnswers: JournalAnswerRecord;
   urges: UrgeRecord;
   reminders: ReminderRecord;
+  emotionOptions: EmotionOptionRecord;
 }
 
 export type AnyRecord = EntityRecordMap[EntityName];

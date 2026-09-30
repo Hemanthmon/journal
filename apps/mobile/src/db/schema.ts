@@ -132,6 +132,15 @@ const MIGRATIONS: string[] = [
     ${SYNC_COLUMNS}
   );
   `,
+  `
+  -- The user's emotion chips for the urge form.
+  CREATE TABLE emotion_options (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {
@@ -154,6 +163,7 @@ export const DATA_TABLES = [
   'habits',
   'urge_records',
   'reminders',
+  'emotion_options',
   'outbox',
   'conflicts',
   'sync_state',
