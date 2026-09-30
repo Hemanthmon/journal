@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router';
-import { addDays, formatLongDate, type DayDetail } from '@journal/shared';
+import { addDays, formatLongDate, formatUrgeDuration, type DayDetail } from '@journal/shared';
 import { useApi } from '../api';
 import { Card, Empty, ErrorBox, Loading, Mood, Outcome, Progress, pct, time12, yesNo } from '../components/ui';
 import { useRange } from '../range';
@@ -129,7 +129,7 @@ export function Day() {
                       <tr key={u.id}>
                         <td>{time12(u.localTime)}</td>
                         <td>{u.intensity}</td>
-                        <td>{u.durationMinutes === null ? '—' : `${u.durationMinutes} min`}</td>
+                        <td>{formatUrgeDuration(u.durationMinutes)}</td>
                         <td><Outcome diverted={u.diverted} /></td>
                         <td>{u.triggerText ?? '—'}</td>
                         <td>{u.emotionBefore ?? '—'}</td>

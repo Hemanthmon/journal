@@ -87,3 +87,16 @@ export const urgeQuerySchema = z
     limit: z.coerce.number().int().min(1).max(1000).default(200),
   })
   .refine((v) => !v.from || !v.to || v.from <= v.to, { message: '`from` must not be after `to`', path: ['from'] });
+
+/** Duration choices offered in the app's picker, in minutes (0 = lasted only seconds). */
+export const URGE_DURATION_OPTIONS = [0, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180] as const;
+
+/** "Under 1 min", "5 min", "1 hr", "1 hr 30 min", or "—" when not recorded. */
+export function formatUrgeDuration(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined) return '—';
+  if (minutes === 0) return 'Under 1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} hr ${m} min` : `${h} hr`;
+}

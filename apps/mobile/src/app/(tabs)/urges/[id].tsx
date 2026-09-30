@@ -14,6 +14,7 @@ import {
 } from '@journal/shared';
 import { describeError } from '../../../api/client';
 import { Body, Button, Card, Chip, ErrorNote, Field, Loading, Muted, Screen, Segmented } from '../../../components/ui';
+import { DurationPicker } from '../../../components/DurationPicker';
 import { createUrge, deleteUrge, getUrge, updateUrge, type UrgeDraft } from '../../../data/urges';
 import { listEmotions } from '../../../data/emotions';
 import { EMOTION_MAX_LENGTH, formatEmotions, parseEmotions } from '../../../lib/emotions';
@@ -28,9 +29,6 @@ const YES_NO = [
   { value: 'yes' as const, label: 'Yes' },
   { value: 'unset' as const, label: 'Skip' },
 ];
-
-/** One-tap urge durations in minutes; anything else goes in "Other". */
-const DURATION_PRESETS = [1, 2, 5, 10, 15, 20, 30, 45, 60, 90];
 
 export default function UrgeForm() {
   const ctx = useCtx();
@@ -53,7 +51,7 @@ export default function UrgeForm() {
   const [period, setPeriod] = useState<Meridiem>(to12Hour(toLocalTime(now)).period);
   const [intensity, setIntensity] = useState<number | null>(null);
   const [trigger, setTrigger] = useState('');
-  const [duration, setDuration] = useState('');
+  const [duration, setDuration] = useState<number | null>(null);
   const [emotions, setEmotions] = useState<string[]>([]);
   const [otherEmotion, setOtherEmotion] = useState('');
   const [action, setAction] = useState(isNew && from === 'breathing' ? 'Did a 2-minute breathing exercise' : '');
@@ -75,7 +73,7 @@ export default function UrgeForm() {
     setPeriod(t.period);
     setIntensity(u.intensity);
     setTrigger(u.triggerText ?? '');
-    setDuration(u.durationMinutes != null ? String(u.durationMinutes) : '');
+    setDuration(u.durationMinutes ?? null);
     const parsed = parseEmotions(u.emotionBefore, emotionList.data.map((e) => e.name));
     setEmotions(parsed.selected);
     setOtherEmotion(parsed.other);
@@ -95,16 +93,12 @@ export default function UrgeForm() {
   const save = async () => {
     setError(null);
     if (intensity === null) return setError('Choose an intensity from 0 to 10.');
-    const durationMinutes = duration.trim() === '' ? null : Number(duration.trim());
-    if (durationMinutes !== null && (!Number.isInteger(durationMinutes) || durationMinutes < 0 || durationMinutes > 1440)) {
-      return setError('Duration should be a whole number of minutes (0–1440).');
-    }
     if (!dateOk || !time24) return setError('Check the date (YYYY-MM-DD) and time (e.g. 9:30 PM).');
     const draft: UrgeDraft = {
       localDate: date,
       localTime: time24,
       intensity,
-      durationMinutes,
+      durationMinutes: duration,
       triggerText: trigger,
       emotionBefore: formatEmotions(emotions, otherEmotion, emotionOptions),
       actionTaken: action,
@@ -191,29 +185,7 @@ export default function UrgeForm() {
 
       <Card>
         <Field label="Trigger" value={trigger} onChangeText={setTrigger} placeholder="What set it off?" />
-        <Body style={{ fontWeight: '600' }}>How long did the urge last?</Body>
-        <Muted>Tap the closest one (optional). Tap again to clear.</Muted>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {DURATION_PRESETS.map((m) => {
-            const on = duration.trim() === String(m);
-            return (
-              <Chip
-                key={m}
-                label={m === 60 ? '1 hr' : m === 90 ? '1½ hr' : `${m} min`}
-                selected={on}
-                onPress={() => setDuration(on ? '' : String(m))}
-              />
-            );
-          })}
-        </View>
-        <Field
-          label="Other (minutes)"
-          value={DURATION_PRESETS.includes(Number(duration)) && duration.trim() !== '' ? '' : duration}
-          onChangeText={(t) => setDuration(t.replace(/\D/g, ''))}
-          keyboardType="number-pad"
-          placeholder="e.g. 25"
-          maxLength={4}
-        />
+        <DurationPicker label="How long did the urge last?" value={duration} onChange={setDuration} />
         <Body style={{ fontWeight: '600' }}>Emotion felt before the urge</Body>
         <Muted>Tap all that apply. Edit this list in Profile → Manage emotions.</Muted>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>

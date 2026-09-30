@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
-import { formatShortDate, type OutcomeCounts, type UrgeAnalytics } from '@journal/shared';
+import { formatShortDate, formatUrgeDuration, type OutcomeCounts, type UrgeAnalytics } from '@journal/shared';
 import { useApi } from '../api';
 import { COLORS, ChartBox, DayLines, Legend, OUTCOME_SERIES, shortDate, tick, tooltipStyle } from '../components/charts';
 import { DivertedRing, Insights, OutcomeCalendar, TimeHeatmap } from '../components/glance';
@@ -260,7 +260,7 @@ export function Urges() {
                       </div>
                     </td>
                     <td>{u.intensity}</td>
-                    <td>{u.durationMinutes === null ? '—' : `${u.durationMinutes} min`}</td>
+                    <td>{formatUrgeDuration(u.durationMinutes)}</td>
                     <td><Outcome diverted={u.diverted} /></td>
                     <td>{u.triggerText ?? '—'}</td>
                     <td>{u.emotionBefore ?? '—'}</td>

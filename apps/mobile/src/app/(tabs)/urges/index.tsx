@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { addDays, formatShortDate, formatTime12, toLocalDate, weekdayName, weekdayOf } from '@journal/shared';
+import { addDays, formatShortDate, formatTime12, formatUrgeDuration, toLocalDate, weekdayName, weekdayOf } from '@journal/shared';
 import { Body, Button, Card, Chip, EmptyState, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { DateNavigator, MiniBars, shortDay } from '../../../components/widgets';
 import { listUrges, urgeTrends } from '../../../data/urges';
@@ -108,7 +108,7 @@ export default function Urges() {
               <View style={{ flex: 1, gap: 2 }}>
                 <Body>
                   {weekdayName(weekdayOf(u.localDate))} {formatShortDate(u.localDate)} · {formatTime12(u.localTime)}
-                  {u.durationMinutes != null ? ` · ${u.durationMinutes} min` : ''}
+                  {u.durationMinutes != null ? ` · ${formatUrgeDuration(u.durationMinutes)}` : ''}
                 </Body>
                 <Muted numberOfLines={1}>{u.triggerText ?? u.emotionBefore ?? 'No details'}</Muted>
               </View>
