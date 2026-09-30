@@ -196,6 +196,32 @@ export function DurationPicker({
               How long did the urge last?
             </Text>
 
+            {/* Quick choice for very short urges: saves 0 minutes, shown as "Under 1 min". */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: value === 0 }}
+              onPress={() => {
+                onChange(0);
+                close();
+              }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: space.sm,
+                minHeight: 48,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: value === 0 ? c.primary : c.border,
+                backgroundColor: value === 0 ? c.primarySoft : c.cardAlt,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Ionicons name="flash-outline" size={18} color={c.primary} />
+              <Text style={{ color: c.primary, fontSize: font.body, fontWeight: '600' }}>Less than a minute</Text>
+            </Pressable>
+            <Text style={{ color: c.muted, fontSize: font.small, textAlign: 'center' }}>or pick hours and minutes</Text>
+
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Wheel values={HOURS} value={h} onChange={setH} unit="Hours" />
               <Text style={{ color: c.text, fontSize: 26, fontWeight: '700', marginTop: space.lg }}>:</Text>
@@ -203,7 +229,7 @@ export function DurationPicker({
             </View>
 
             <Text style={{ color: c.muted, fontSize: font.body, textAlign: 'center' }}>
-              {total === 0 ? 'Only a few seconds (under 1 min)' : formatUrgeDuration(total)}
+              {total === 0 ? 'Less than a minute' : formatUrgeDuration(total)}
             </Text>
 
             <View style={{ flexDirection: 'row', gap: space.sm }}>
