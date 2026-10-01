@@ -3,7 +3,7 @@ import type { Db } from '../db/types';
 
 /** Device-only preferences, stored in the local `prefs` table (never synced). */
 export interface Prefs {
-  theme: 'system' | 'light' | 'dark';
+  theme: 'system' | 'light' | 'dark' | 'coffee';
   reminderEnabled: boolean;
   reminderTime: string; // HH:MM
   showUrgesOnDashboard: boolean;

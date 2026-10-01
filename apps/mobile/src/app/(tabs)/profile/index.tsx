@@ -213,6 +213,7 @@ export default function Profile() {
             { value: 'system', label: 'System' },
             { value: 'light', label: 'Light' },
             { value: 'dark', label: 'Dark' },
+            { value: 'coffee', label: 'Coffee' },
           ]}
           value={prefs.theme}
           onChange={(v) => void prefs.set({ theme: v })}

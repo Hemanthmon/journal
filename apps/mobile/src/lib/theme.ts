@@ -38,6 +38,25 @@ const dark: typeof light = {
   track: '#2B303C',
 };
 
+/** Coffee: light gold cream surfaces, brown for secondary detail, dark brown for what matters. */
+const coffee: typeof light = {
+  bg: '#F3E6C8',
+  card: '#FBF4E2',
+  cardAlt: '#EFDFBC',
+  text: '#3B2416',
+  muted: '#7A5536',
+  border: '#DCC59A',
+  primary: '#4A2C1A',
+  primaryText: '#FBF4E2',
+  primarySoft: '#E8D4AC',
+  success: '#4F7A3A',
+  successSoft: '#E3E6C4',
+  warning: '#8A5A12',
+  danger: '#A63A2A',
+  dangerSoft: '#F2D6C8',
+  track: '#E3CFA6',
+};
+
 export type Palette = typeof light;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
@@ -47,6 +66,7 @@ export const font = { small: 13, body: 16, large: 18, title: 22, hero: 28 };
 export function useTheme(): { c: Palette; dark: boolean } {
   const pref = usePrefs((s) => s.theme);
   const system = useColorScheme();
+  if (pref === 'coffee') return { c: coffee, dark: false };
   const isDark = pref === 'system' ? system === 'dark' : pref === 'dark';
   return { c: isDark ? dark : light, dark: isDark };
 }

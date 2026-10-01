@@ -6,6 +6,7 @@
   --muted: #5d6575;
   --border: #e1e5ee;
   --primary: #4e6fcb;
+  --primary-text: #ffffff;
   --primary-soft: #e3e9f9;
   --success: #2f8f6b;
   --success-soft: #ddf1e8;
@@ -18,8 +19,9 @@
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* "System" (no data-theme) follows the OS; an explicit choice sets data-theme on <html>. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #101217;
     --card: #1a1d24;
     --card-alt: #222631;
@@ -27,6 +29,7 @@
     --muted: #a0a7b4;
     --border: #2b303c;
     --primary: #8aa5f0;
+    --primary-text: #0e1320;
     --primary-soft: #26314d;
     --success: #6ccba5;
     --success-soft: #1e3b31;
@@ -36,6 +39,45 @@
     --shadow: none;
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #101217;
+  --card: #1a1d24;
+  --card-alt: #222631;
+  --text: #eceef3;
+  --muted: #a0a7b4;
+  --border: #2b303c;
+  --primary: #8aa5f0;
+  --primary-text: #0e1320;
+  --primary-soft: #26314d;
+  --success: #6ccba5;
+  --success-soft: #1e3b31;
+  --warning: #e0b45c;
+  --danger: #f08a84;
+  --danger-soft: #44211f;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+/* Coffee: light gold cream surfaces, brown for secondary detail, dark brown for what matters. */
+:root[data-theme='coffee'] {
+  --bg: #f3e6c8;
+  --card: #fbf4e2;
+  --card-alt: #efdfbc;
+  --text: #3b2416;
+  --muted: #7a5536;
+  --border: #dcc59a;
+  --primary: #4a2c1a;
+  --primary-text: #fbf4e2;
+  --primary-soft: #e8d4ac;
+  --success: #4f7a3a;
+  --success-soft: #e3e6c4;
+  --warning: #8a5a12;
+  --danger: #a63a2a;
+  --danger-soft: #f2d6c8;
+  --shadow: 0 1px 2px rgba(74, 44, 26, 0.08), 0 4px 16px rgba(74, 44, 26, 0.06);
+  color-scheme: light;
 }
 
 * {
@@ -242,7 +284,7 @@ h3 {
 .btn.primary {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--primary-text);
 }
 .btn.primary:hover {
   filter: brightness(1.05);
@@ -271,7 +313,7 @@ h3 {
 .chip.on {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--primary-text);
 }
 
 input[type='date'],

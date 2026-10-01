@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router';
 import { formatLongDate } from '@journal/shared';
 import { PRESETS, useRange } from '../range';
 import { useMe, useSession } from '../session';
+import { THEMES, type Theme, useThemePref } from '../theme';
 
 const NAV = [
   { to: '/', label: 'Overview', icon: '◎', end: true },
@@ -58,6 +59,22 @@ function ExportButton() {
   );
 }
 
+function ThemeSelect() {
+  const [theme, setTheme] = useThemePref();
+  return (
+    <label className="row small">
+      Theme
+      <select value={theme} onChange={(e) => setTheme(e.target.value as Theme)}>
+        {THEMES.map((t) => (
+          <option key={t.value} value={t.value}>
+            {t.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function Layout() {
   const me = useMe();
   const { logout } = useSession();
@@ -77,6 +94,7 @@ export function Layout() {
             Viewing <strong>{me.ownerName}</strong> · read-only
           </span>
           <span>{me.viewerEmail}</span>
+          <ThemeSelect />
           <button className="btn" type="button" onClick={() => void logout()}>
             Sign out
           </button>

@@ -11,7 +11,10 @@ import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { Urges } from './pages/Urges';
 import { SessionProvider, useSession } from './session';
+import { applyTheme } from './theme';
 import './styles.css';
+
+applyTheme();
 
 function App() {
   const { status } = useSession();
