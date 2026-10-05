@@ -1,10 +1,12 @@
+import { AxiosError } from 'axios';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { DashboardMe } from '@journal/shared';
 import { api, setUnauthenticatedHandler } from './api';
 
 interface SessionValue {
   me: DashboardMe | null;
-  status: 'loading' | 'signedOut' | 'signedIn';
+  /** 'unreachable': the server didn't answer, which says nothing about the session. */
+  status: 'loading' | 'signedOut' | 'signedIn' | 'unreachable';
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -16,13 +18,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionValue['status']>('loading');
 
   const refresh = useCallback(async () => {
-    try {
-      const res = await api.get<{ data: DashboardMe }>('/me');
-      setMe(res.data.data);
-      setStatus('signedIn');
-    } catch {
-      setMe(null);
-      setStatus('signedOut');
+    // The free Render plan can take about a minute to wake, so keep retrying a server
+    // that isn't answering. Only a 401 means the session is gone.
+    setStatus((s) => (s === 'unreachable' ? 'loading' : s));
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await api.get<{ data: DashboardMe }>('/me');
+        setMe(res.data.data);
+        setStatus('signedIn');
+        return;
+      } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          setMe(null);
+          setStatus('signedOut');
+          return;
+        }
+        if (attempt >= 5) {
+          setStatus((s) => (s === 'signedIn' ? s : 'unreachable'));
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
     }
   }, []);
 

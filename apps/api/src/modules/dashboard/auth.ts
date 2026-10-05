@@ -23,7 +23,8 @@ import { getMailer, logMailFailure } from './mailer';
  *  - Codes: 6 random digits, stored as an HMAC, valid 10 minutes, max 5 attempts,
  *    single use; requesting a new code invalidates older ones.
  *  - Session: a signed token in an HttpOnly, SameSite=Strict cookie scoped to
- *    /api/dashboard. Every request re-checks that the grant is still active.
+ *    /api/dashboard. Every request re-checks that the grant is still active, and renews
+ *    the cookie, so the session only ends after DASHBOARD_SESSION_HOURS without use.
  */
 
 const CODE_TTL_MINUTES = 10;
@@ -33,6 +34,8 @@ export const SESSION_COOKIE = 'jd_session';
 const COOKIE_PATH = '/api/dashboard';
 const AUDIENCE = 'journal-dashboard';
 const ISSUER = 'journal-api';
+/** A session older than this is re-issued on the next request (sliding expiry). */
+const RENEW_AFTER_SECONDS = 5 * 60;
 
 type Row = RowDataPacket & Record<string, unknown>;
 
@@ -60,6 +63,18 @@ export function sessionCookie(token: string, maxAgeSeconds: number): string {
   return attrs.join('; ');
 }
 
+function issueSession(res: Response, grantId: string, viewerEmail: string) {
+  const maxAge = config.dashboard.sessionHours * 3600;
+  const token = jwt.sign({ typ: 'dashboard', gid: grantId }, config.dashboard.sessionSecret, {
+    algorithm: 'HS256',
+    subject: viewerEmail,
+    audience: AUDIENCE,
+    issuer: ISSUER,
+    expiresIn: maxAge,
+  });
+  res.setHeader('Set-Cookie', sessionCookie(token, maxAge));
+}
+
 function readCookie(req: Request, name: string): string | undefined {
   const header = req.headers.cookie;
   if (!header) return undefined;
@@ -79,7 +94,7 @@ export interface DashboardContext {
 }
 
 /** Requires a valid dashboard session whose grant is still active. */
-export async function requireDashboard(req: Request, _res: Response, next: NextFunction) {
+export async function requireDashboard(req: Request, res: Response, next: NextFunction) {
   const token = readCookie(req, SESSION_COOKIE);
   if (!token) return next(new AppError(401, ErrorCode.UNAUTHENTICATED, 'Please sign in'));
   let payload: jwt.JwtPayload;
@@ -110,6 +125,9 @@ export async function requireDashboard(req: Request, _res: Response, next: NextF
     ownerName: String(owner.name),
     timezone: safeTimeZone(String(owner.timezone)),
   };
+  if (typeof payload.iat !== 'number' || Date.now() / 1000 - payload.iat >= RENEW_AFTER_SECONDS) {
+    issueSession(res, grant.id, grant.viewerEmail);
+  }
   next();
 }
 
@@ -187,15 +205,7 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
     });
     if (!ok) throw invalidCode();
 
-    const maxAge = config.dashboard.sessionHours * 3600;
-    const token = jwt.sign({ typ: 'dashboard', gid: grant.id }, config.dashboard.sessionSecret, {
-      algorithm: 'HS256',
-      subject: grant.viewerEmail,
-      audience: AUDIENCE,
-      issuer: ISSUER,
-      expiresIn: maxAge,
-    });
-    res.setHeader('Set-Cookie', sessionCookie(token, maxAge));
+    issueSession(res, grant.id, grant.viewerEmail);
     res.json({ data: { signedIn: true } });
   });
 

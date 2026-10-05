@@ -41,7 +41,7 @@ const envSchema = z.object({
   DASHBOARD_VIEWER_EMAIL: z.string().trim().toLowerCase().default(''),
   DASHBOARD_OWNER_EMAIL: z.string().trim().toLowerCase().default(''),
   DASHBOARD_SESSION_SECRET: z.string().default(''),
-  DASHBOARD_SESSION_HOURS: z.coerce.number().int().min(1).max(168).default(12),
+  DASHBOARD_SESSION_HOURS: z.coerce.number().int().min(1).max(720).default(168),
   // How login codes are delivered: 'brevo' (HTTPS email API; SMTP is blocked on Render's
   // free plan) or 'console' (development/test only: printed to the server log).
   MAIL_PROVIDER: z.enum(['brevo', 'console']).default('console'),

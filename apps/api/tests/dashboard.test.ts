@@ -212,6 +212,29 @@ describe('dashboard API protection', () => {
     expect((await api.get('/api/dashboard/overview').set('Cookie', `jd_session=${expired}`)).status).toBe(401);
   });
 
+  it('renews an active session so it only ends after a period without use', async () => {
+    const fresh = await signIn();
+    const soon = await api.get('/api/dashboard/me').set('Cookie', fresh);
+    expect(soon.status).toBe(200);
+    expect(soon.headers['set-cookie']).toBeUndefined();
+
+    const [grants] = await getPool().execute<RowDataPacket[]>(
+      'SELECT id FROM dashboard_access WHERE viewer_email = ? AND revoked_at IS NULL',
+      [VIEWER],
+    );
+    const old = jwt.sign(
+      { typ: 'dashboard', gid: grants[0]!.id, iat: Math.floor(Date.now() / 1000) - 3600 },
+      config.dashboard.sessionSecret,
+      { subject: VIEWER, audience: 'journal-dashboard', issuer: 'journal-api', expiresIn: '2h' },
+    );
+    const res = await api.get('/api/dashboard/me').set('Cookie', `jd_session=${old}`);
+    expect(res.status).toBe(200);
+    const cookie = (res.headers['set-cookie'] as unknown as string[])[0]!;
+    expect(cookie).toMatch(/^jd_session=/);
+    expect(cookie).toContain(`Max-Age=${config.dashboard.sessionHours * 3600}`);
+    expect(cookie).not.toContain(old);
+  });
+
   it('is read-only: no write routes exist', async () => {
     const cookie = await signIn();
     for (const [method, url] of [

@@ -17,8 +17,18 @@ import './styles.css';
 applyTheme();
 
 function App() {
-  const { status } = useSession();
+  const { status, refresh } = useSession();
   if (status === 'loading') return <Loading />;
+  if (status === 'unreachable') {
+    return (
+      <div className="empty">
+        <p>Can't reach the server right now. You're still signed in.</p>
+        <button className="btn primary" type="button" onClick={() => void refresh()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
   // Access is enforced by the API on every request; this only chooses what to render.
   if (status === 'signedOut') return <Login />;
   return (
