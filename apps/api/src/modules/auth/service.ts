@@ -93,17 +93,28 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
 
 /**
  * Rotates a refresh token: the presented token is revoked and a new one issued in the same
- * family. Presenting an already-rotated token means it was copied (or replayed), so the
- * whole family is revoked and every device holding it must log in again.
+ * family.
+ *
+ * Presenting an already-rotated token is normally a replay, so the whole family is revoked.
+ * The exception is a rotated token whose replacement has never been used: that is what a
+ * lost response looks like (the phone dropped signal, or the app was closed mid-request,
+ * so it never stored the new token). The unused replacement is retired and a fresh token
+ * issued instead of logging the user out. Once a replacement has itself been used, two
+ * holders exist and the family is still revoked.
  */
 export async function refresh(refreshToken: string): Promise<AuthResponse> {
   const now = new Date();
   const outcome = await withTransaction(async (conn) => {
-    const row = await repo.findRefreshTokenForUpdate(conn, hashRefreshToken(refreshToken));
+    let row = await repo.findRefreshTokenForUpdate(conn, hashRefreshToken(refreshToken));
     if (!row) return { kind: 'invalid' as const };
     if (row.revoked_at) {
-      await repo.revokeFamily(conn, row.family_id, now);
-      return { kind: 'reused' as const };
+      const next = row.replaced_by ? await repo.findRefreshTokenByIdForUpdate(conn, row.replaced_by) : undefined;
+      if (!next || next.revoked_at) {
+        await repo.revokeFamily(conn, row.family_id, now);
+        return { kind: 'reused' as const };
+      }
+      // Lost response: continue the session from the unused replacement.
+      row = next;
     }
     if (row.expires_at.getTime() <= now.getTime()) return { kind: 'invalid' as const };
 

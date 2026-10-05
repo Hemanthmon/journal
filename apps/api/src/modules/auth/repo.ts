@@ -85,6 +85,7 @@ export interface RefreshTokenRow {
   family_id: string;
   expires_at: Date;
   revoked_at: Date | null;
+  replaced_by: string | null;
 }
 
 export async function insertRefreshToken(
@@ -105,9 +106,21 @@ export async function findRefreshTokenForUpdate(
   tokenHash: string,
 ): Promise<RefreshTokenRow | undefined> {
   const [rows] = await conn.execute<(RefreshTokenRow & RowDataPacket)[]>(
-    `SELECT id, user_id, family_id, expires_at, revoked_at
+    `SELECT id, user_id, family_id, expires_at, revoked_at, replaced_by
        FROM refresh_tokens WHERE token_hash = ? FOR UPDATE`,
     [tokenHash],
+  );
+  return rows[0];
+}
+
+export async function findRefreshTokenByIdForUpdate(
+  conn: PoolConnection,
+  id: string,
+): Promise<RefreshTokenRow | undefined> {
+  const [rows] = await conn.execute<(RefreshTokenRow & RowDataPacket)[]>(
+    `SELECT id, user_id, family_id, expires_at, revoked_at, replaced_by
+       FROM refresh_tokens WHERE id = ? FOR UPDATE`,
+    [id],
   );
   return rows[0];
 }

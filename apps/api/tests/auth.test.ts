@@ -140,24 +140,51 @@ describe('POST /api/auth/refresh', () => {
     expect(res.body.error.code).toBe('INVALID_REFRESH_TOKEN');
   });
 
+  it('recovers when the client never received the rotated token (lost response)', async () => {
+    const { tokens } = await registerUser(api);
+    const lost = await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
+    const lostToken = lost.body.data.tokens.refreshToken as string;
+
+    // The client still holds the old token; its replacement was never used.
+    const retry = await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
+    expect(retry.status).toBe(200);
+    const profile = await api.get('/api/profile').set(bearer(retry.body.data.tokens.accessToken));
+    expect(profile.status).toBe(200);
+
+    // Once the session moves on from the new token, the one nobody received is a replay.
+    await api.post('/api/auth/refresh').send({ refreshToken: retry.body.data.tokens.refreshToken });
+    expect((await api.post('/api/auth/refresh').send({ refreshToken: lostToken })).status).toBe(401);
+  });
+
+  it('keeps working after a recovered lost response', async () => {
+    const { tokens } = await registerUser(api);
+    await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
+    const retry = await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
+    const next = await api.post('/api/auth/refresh').send({ refreshToken: retry.body.data.tokens.refreshToken });
+    expect(next.status).toBe(200);
+  });
+
   it('detects reuse of a rotated token and revokes the whole session family', async () => {
     const { tokens } = await registerUser(api);
     const first = await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
-    const newToken = first.body.data.tokens.refreshToken as string;
+    // The replacement is used, so a second holder of the old token is a replay.
+    const second = await api.post('/api/auth/refresh').send({ refreshToken: first.body.data.tokens.refreshToken });
+    const newest = second.body.data.tokens.refreshToken as string;
 
     // Replaying the old (already rotated) token...
     const replay = await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
     expect(replay.status).toBe(401);
 
     // ...also kills the legitimate newest token from the same login.
-    const afterReplay = await api.post('/api/auth/refresh').send({ refreshToken: newToken });
+    const afterReplay = await api.post('/api/auth/refresh').send({ refreshToken: newest });
     expect(afterReplay.status).toBe(401);
   });
 
   it('does not affect sessions from a separate login', async () => {
     const { user, password, tokens } = await registerUser(api);
     const other = await api.post('/api/auth/login').send({ email: user.email, password });
-    await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
+    const first = await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken });
+    await api.post('/api/auth/refresh').send({ refreshToken: first.body.data.tokens.refreshToken });
     await api.post('/api/auth/refresh').send({ refreshToken: tokens.refreshToken }); // reuse -> revoke family 1
     const res = await api.post('/api/auth/refresh').send({ refreshToken: other.body.data.tokens.refreshToken });
     expect(res.status).toBe(200);
