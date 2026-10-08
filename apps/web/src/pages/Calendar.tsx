@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BLOCK_COLORS,
   addDays,
@@ -203,6 +203,20 @@ export function Calendar() {
   const url = weekFrom ? `/calendar?from=${weekFrom}&to=${addDays(weekFrom, 6)}` : '/calendar';
   const { data, error, loading, reload } = useApi<DashboardCalendar>(url);
   const [day, setDay] = useState<string | null>(null);
+  const body = useRef<HTMLDivElement>(null);
+
+  // Open at the current time this week (else the earliest block, else 8 AM), an hour early for context.
+  const shownFrom = data?.from;
+  useEffect(() => {
+    if (!data || !body.current) return;
+    const thisWeek = data.today >= data.from && data.today <= data.to;
+    const now = new Date().getHours() * 60 + new Date().getMinutes();
+    const first = data.blocks.length ? Math.min(...data.blocks.map((b) => mins(b.start))) : 8 * 60;
+    const focus = thisWeek ? now : first;
+    body.current.scrollTop = Math.max(0, ((focus - FIRST_HOUR * 60) / 60) * HOUR - HOUR);
+    // Only when a different week is shown, not after every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownFrom]);
 
   if (error) return <ErrorBox message={error} />;
   if (!data) return <Loading />;
@@ -269,7 +283,7 @@ export function Calendar() {
             </div>
           ))}
         </div>
-        <div className="cal-body" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
+        <div ref={body} className="cal-body" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
           <div className="cal-gutter" style={{ height: (LAST_HOUR - FIRST_HOUR) * HOUR }}>
             {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => (
               <div key={i} className="cal-hour-label" style={{ top: i * HOUR }}>

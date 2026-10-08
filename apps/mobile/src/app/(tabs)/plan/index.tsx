@@ -168,6 +168,7 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
             <Button style={{ flex: 1 }} title="Task" icon="add" variant="secondary" onPress={() => router.push({ pathname: '/plan/task', params: { date } })} />
           </View>
           <Timeline
+            dayKey={date}
             items={data.timeline}
             identities={ids}
             nowMinutes={date === today ? new Date().getHours() * 60 + new Date().getMinutes() : null}
