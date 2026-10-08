@@ -146,8 +146,8 @@ const MIGRATIONS: string[] = [
   ALTER TABLE urge_records ADD COLUMN duration_minutes INTEGER;
   `,
   `
-  -- Planner (Atomic Habits): who I'm becoming, monthly focuses / weekly goals, daily
-  -- tasks, and weekly / monthly reviews.
+  -- Planner (Atomic Habits): identities, monthly focuses / weekly goals, daily tasks,
+  -- and weekly / monthly reviews.
   CREATE TABLE identities (
     id TEXT PRIMARY KEY NOT NULL,
     statement TEXT NOT NULL,
@@ -182,6 +182,52 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX ix_plan_tasks_date ON plan_tasks (local_date);
   CREATE TABLE plan_reviews (
+    id TEXT PRIMARY KEY NOT NULL,
+    level TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    went_well TEXT,
+    make_easier TEXT,
+    one_percent TEXT,
+    ${SYNC_COLUMNS}
+  );
+  `,
+  `
+  -- Repair: a database opened before the planner existed (e.g. during a hot reload) could
+  -- have missed the step above. Creates whatever is missing; a no-op otherwise.
+  CREATE TABLE IF NOT EXISTS identities (
+    id TEXT PRIMARY KEY NOT NULL,
+    statement TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  CREATE TABLE IF NOT EXISTS plan_goals (
+    id TEXT PRIMARY KEY NOT NULL,
+    level TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    text TEXT NOT NULL,
+    identity_id TEXT,
+    parent_id TEXT,
+    done_at TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  CREATE INDEX IF NOT EXISTS ix_plan_goals_period ON plan_goals (level, period_start);
+  CREATE TABLE IF NOT EXISTS plan_tasks (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    local_date TEXT NOT NULL,
+    identity_id TEXT,
+    goal_id TEXT,
+    local_time TEXT,
+    place TEXT,
+    two_minute TEXT,
+    completed_at TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  CREATE INDEX IF NOT EXISTS ix_plan_tasks_date ON plan_tasks (local_date);
+  CREATE TABLE IF NOT EXISTS plan_reviews (
     id TEXT PRIMARY KEY NOT NULL,
     level TEXT NOT NULL,
     period_start TEXT NOT NULL,
