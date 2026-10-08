@@ -7,7 +7,7 @@ import { getKv, setKv, type Ctx } from '../data/records';
 import { openDb } from '../db/expoDb';
 import { wipeUserData } from '../db/schema';
 import type { Db } from '../db/types';
-import { cancelReminder } from '../lib/notifications';
+import { cancelAllNotifications } from '../lib/notifications';
 import { queryClient, refreshLocalQueries } from '../lib/queryClient';
 import { loadPrefs, usePrefs } from './prefs';
 import { syncService } from './sync';
@@ -104,7 +104,7 @@ export const useSession = create<SessionState>((set, get) => {
       const { db } = get();
       if (db) await wipeUserData(db);
       await tokens.clear();
-      await cancelReminder();
+      await cancelAllNotifications();
       await usePrefs.getState().set({ reminderEnabled: false });
       queryClient.clear();
       set({ status: 'signedOut', user: null, ctx: null, needsReauth: false });

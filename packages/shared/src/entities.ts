@@ -9,6 +9,16 @@ import {
   type JournalQuestionRecord,
 } from './schemas/questions';
 import { emotionOptionRecordSchema, type EmotionOptionRecord } from './schemas/emotions';
+import {
+  identityRecordSchema,
+  planGoalRecordSchema,
+  planReviewRecordSchema,
+  planTaskRecordSchema,
+  type IdentityRecord,
+  type PlanGoalRecord,
+  type PlanReviewRecord,
+  type PlanTaskRecord,
+} from './schemas/planner';
 import { reminderRecordSchema, type ReminderRecord } from './schemas/reminders';
 import { urgeRecordSchema, type UrgeRecord } from './schemas/urges';
 
@@ -160,6 +170,63 @@ export const ENTITIES = {
     // A default emotion the user removed must not come back from another device.
     stickyDelete: true,
   },
+  identities: {
+    table: 'identities',
+    fields: [
+      ...BASE_FIELDS,
+      f('statement', 'statement', 'string'),
+      f('isActive', 'is_active', 'bool'),
+      f('displayOrder', 'display_order', 'number'),
+    ],
+    schema: identityRecordSchema,
+    stickyDelete: true,
+  },
+  planGoals: {
+    table: 'plan_goals',
+    fields: [
+      ...BASE_FIELDS,
+      f('level', 'level', 'string'),
+      f('periodStart', 'period_start', 'date'),
+      f('text', 'text', 'string'),
+      f('identityId', 'identity_id', 'string'),
+      f('parentId', 'parent_id', 'string'),
+      f('doneAt', 'done_at', 'datetime'),
+      f('displayOrder', 'display_order', 'number'),
+    ],
+    schema: planGoalRecordSchema,
+    stickyDelete: true,
+  },
+  planTasks: {
+    table: 'plan_tasks',
+    fields: [
+      ...BASE_FIELDS,
+      f('title', 'title', 'string'),
+      f('localDate', 'local_date', 'date'),
+      f('identityId', 'identity_id', 'string'),
+      f('goalId', 'goal_id', 'string'),
+      f('localTime', 'local_time', 'time'),
+      f('place', 'place', 'string'),
+      f('twoMinute', 'two_minute', 'string'),
+      f('completedAt', 'completed_at', 'datetime'),
+      f('displayOrder', 'display_order', 'number'),
+    ],
+    schema: planTaskRecordSchema,
+    stickyDelete: true,
+  },
+  planReviews: {
+    table: 'plan_reviews',
+    fields: [
+      ...BASE_FIELDS,
+      f('level', 'level', 'string'),
+      f('periodStart', 'period_start', 'date'),
+      f('wentWell', 'went_well', 'string'),
+      f('makeEasier', 'make_easier', 'string'),
+      f('onePercent', 'one_percent', 'string'),
+    ],
+    schema: planReviewRecordSchema,
+    // One per period (deterministic id), so a removed review can be written again.
+    stickyDelete: false,
+  },
 } satisfies Record<string, EntityDef>;
 
 export type EntityName = keyof typeof ENTITIES;
@@ -174,6 +241,10 @@ export const ENTITY_ORDER: EntityName[] = [
   'urges',
   'reminders',
   'emotionOptions',
+  'identities',
+  'planGoals',
+  'planTasks',
+  'planReviews',
 ];
 
 export interface EntityRecordMap {
@@ -185,6 +256,10 @@ export interface EntityRecordMap {
   urges: UrgeRecord;
   reminders: ReminderRecord;
   emotionOptions: EmotionOptionRecord;
+  identities: IdentityRecord;
+  planGoals: PlanGoalRecord;
+  planTasks: PlanTaskRecord;
+  planReviews: PlanReviewRecord;
 }
 
 export type AnyRecord = EntityRecordMap[EntityName];

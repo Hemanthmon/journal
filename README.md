@@ -1,6 +1,7 @@
 # Journal
 
-A private, offline-first app for daily habits, journaling and urge tracking.
+A private, offline-first app for daily habits, journaling, urge tracking and an Atomic Habits
+planner (identities, monthly focuses → weekly goals → daily tasks, reviews, reminders).
 
 ```
 packages/shared   Zod schemas, types, sync protocol, date/progress utilities (used by both apps)
@@ -53,20 +54,23 @@ Use `--profile production` for a Play Store bundle (.aab).
 
 ### Web dashboard (read-only viewer)
 
-A second person (the *viewer*) can see one user's (the *owner's*) records in a browser, but only
-after the owner grants access, and never change them.
+Other people (*viewers*) can see one user's (the *owner's*) records in a browser, including the
+planner, but only after the owner grants access, and never change them.
 
-1. In `apps/api/.env` set `DASHBOARD_VIEWER_EMAIL`, optionally `DASHBOARD_OWNER_EMAIL` (the owner's
-   app account; when empty, the only account in the database is used) and a random `DASHBOARD_SESSION_SECRET` (32+ characters, different from the JWT secret).
-   For real email delivery set `MAIL_PROVIDER=brevo`, `BREVO_API_KEY` and `MAIL_FROM_EMAIL`; in
+1. In `apps/api/.env` set a random `DASHBOARD_SESSION_SECRET` (32+ characters, different from the
+   JWT secret). The owner then shares from the app: **Profile → Dashboard access** (name + email);
+   the viewer gets an invitation email. Optionally, `DASHBOARD_VIEWER_EMAIL` (and
+   `DASHBOARD_OWNER_EMAIL`, needed when there is more than one account) grants one more viewer
+   from the server. For real email delivery set `MAIL_PROVIDER=brevo`, `BREVO_API_KEY` and `MAIL_FROM_EMAIL`; in
    development `MAIL_PROVIDER=console` prints the sign-in code to the API log.
 2. Development: `npm run api:dev` and `npm run dev -w @journal/web`, then open http://localhost:5173.
    Production: `npm run build -w @journal/web`; the API serves `apps/web/dist` itself.
 3. The viewer enters their email, receives a 6-digit code (valid 10 minutes, 5 attempts, single use)
-   and gets a 12-hour HttpOnly session cookie.
+   and gets an HttpOnly session cookie that lasts while the dashboard is in use.
 
-**Revoking access:** clear `DASHBOARD_VIEWER_EMAIL` (or change it) and restart the API. The grant row
-in `dashboard_access` is marked revoked, and every open session stops working on its next request.
+**Revoking access:** remove the person in **Profile → Dashboard access** (or, for the server-set
+viewer, clear `DASHBOARD_VIEWER_EMAIL` and restart). The grant row in `dashboard_access` is marked
+revoked, and every open session stops working on its next request.
 
 ### Tests
 

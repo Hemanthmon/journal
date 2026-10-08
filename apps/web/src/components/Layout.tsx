@@ -8,6 +8,7 @@ const NAV = [
   { to: '/', label: 'Overview', icon: '◎', end: true },
   { to: '/habits', label: 'Habits', icon: '✓', end: false },
   { to: '/journal', label: 'Routine & Journal', icon: '✎', end: false },
+  { to: '/planner', label: 'Planner', icon: '❦', end: false },
   { to: '/urges', label: 'Urge Tracker', icon: '〰', end: false },
 ];
 

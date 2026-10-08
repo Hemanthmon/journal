@@ -316,3 +316,57 @@ export interface UrgeAnalytics {
   /** Newest first. */
   records: UrgeView[];
 }
+
+// ------------------------------------------------------------------ planner
+
+export interface PlannerIdentity {
+  id: string;
+  statement: string;
+  active: boolean;
+  /** Completed tasks linked to this identity: this week, this month, ever. */
+  weekVotes: number;
+  monthVotes: number;
+  totalVotes: number;
+}
+
+export interface PlannerTask {
+  title: string;
+  done: boolean;
+  /** "HH:MM" or null */
+  time: string | null;
+  place: string | null;
+  twoMinute: string | null;
+  identity: string | null;
+}
+
+export interface PlannerGoal {
+  text: string;
+  done: boolean;
+  identity: string | null;
+  /** Weekly goal: the monthly focus it serves. */
+  focus: string | null;
+  /** Monthly focus: its weekly goals. */
+  weeklyGoals: { text: string; done: boolean }[];
+  tasks: number;
+  tasksDone: number;
+}
+
+export interface PlannerReview {
+  level: 'week' | 'month';
+  periodStart: string;
+  wentWell: string | null;
+  makeEasier: string | null;
+  onePercent: string | null;
+}
+
+export interface DashboardPlanner {
+  today: string;
+  week: { start: string; end: string; goals: PlannerGoal[]; tasks: number; tasksDone: number };
+  month: { start: string; end: string; focuses: PlannerGoal[]; tasks: number; tasksDone: number };
+  days: { date: string; weekday: string; tasks: PlannerTask[] }[];
+  identities: PlannerIdentity[];
+  /** Yesterday's unfinished tasks (if the selected week is the current one). */
+  missedYesterday: string[];
+  /** Newest first, at most 8. */
+  reviews: PlannerReview[];
+}

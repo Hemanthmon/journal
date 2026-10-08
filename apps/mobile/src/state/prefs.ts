@@ -7,6 +7,12 @@ export interface Prefs {
   reminderEnabled: boolean;
   reminderTime: string; // HH:MM
   showUrgesOnDashboard: boolean;
+  /** Planner: a notification at each task's time, plus optional morning / evening nudges. */
+  planTaskReminders: boolean;
+  planMorningEnabled: boolean;
+  planMorningTime: string; // HH:MM
+  planEveningEnabled: boolean;
+  planEveningTime: string; // HH:MM
 }
 
 const DEFAULTS: Prefs = {
@@ -14,6 +20,11 @@ const DEFAULTS: Prefs = {
   reminderEnabled: false,
   reminderTime: '21:00',
   showUrgesOnDashboard: true,
+  planTaskReminders: true,
+  planMorningEnabled: false,
+  planMorningTime: '07:30',
+  planEveningEnabled: false,
+  planEveningTime: '21:30',
 };
 
 let prefsDb: Db | null = null;

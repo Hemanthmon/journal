@@ -1,12 +1,14 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { dashboardRangeSchema, localDateSchema, type DashboardMe } from '@journal/shared';
 import { notFound } from '../../lib/errors';
+import { localDateIn } from '../../lib/tz';
 import { requireIdParam } from '../../lib/rows';
 import { validateQuery } from '../../middleware/validate';
 import { Analyzer, firstDataDate, resolveRange } from './analytics';
 import { dashboardAuthRouter, requireDashboard, type DashboardContext } from './auth';
 import { loadOwnerData } from './data';
 import { buildWorkbook } from './export';
+import { buildPlanner, loadPlannerData } from './planner';
 
 /**
  * Read-only web dashboard API. Every data route requires a dashboard session and serves
@@ -84,6 +86,14 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
   router.get('/urges', range, async (req, res) => {
     const { a, range: r } = await analyzer(req, res);
     res.json({ data: a.urgeAnalytics(r) });
+  });
+
+  /** The planner for the week containing `?date=` (default: the owner's today). */
+  router.get('/planner', async (req, res) => {
+    const c = ctx(req);
+    const today = localDateIn(new Date(), c.timezone);
+    const q = typeof req.query.date === 'string' && localDateSchema.safeParse(req.query.date).success ? req.query.date : today;
+    res.json({ data: buildPlanner(await loadPlannerData(c.ownerUserId), today, q) });
   });
 
   router.get('/export.xlsx', range, async (req, res) => {

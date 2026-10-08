@@ -145,6 +145,52 @@ const MIGRATIONS: string[] = [
   -- How long an urge lasted, in minutes (NULL = not recorded).
   ALTER TABLE urge_records ADD COLUMN duration_minutes INTEGER;
   `,
+  `
+  -- Planner (Atomic Habits): who I'm becoming, monthly focuses / weekly goals, daily
+  -- tasks, and weekly / monthly reviews.
+  CREATE TABLE identities (
+    id TEXT PRIMARY KEY NOT NULL,
+    statement TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  CREATE TABLE plan_goals (
+    id TEXT PRIMARY KEY NOT NULL,
+    level TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    text TEXT NOT NULL,
+    identity_id TEXT,
+    parent_id TEXT,
+    done_at TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  CREATE INDEX ix_plan_goals_period ON plan_goals (level, period_start);
+  CREATE TABLE plan_tasks (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    local_date TEXT NOT NULL,
+    identity_id TEXT,
+    goal_id TEXT,
+    local_time TEXT,
+    place TEXT,
+    two_minute TEXT,
+    completed_at TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    ${SYNC_COLUMNS}
+  );
+  CREATE INDEX ix_plan_tasks_date ON plan_tasks (local_date);
+  CREATE TABLE plan_reviews (
+    id TEXT PRIMARY KEY NOT NULL,
+    level TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    went_well TEXT,
+    make_easier TEXT,
+    one_percent TEXT,
+    ${SYNC_COLUMNS}
+  );
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {
@@ -168,6 +214,10 @@ export const DATA_TABLES = [
   'urge_records',
   'reminders',
   'emotion_options',
+  'identities',
+  'plan_goals',
+  'plan_tasks',
+  'plan_reviews',
   'outbox',
   'conflicts',
   'sync_state',

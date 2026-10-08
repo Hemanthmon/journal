@@ -3,15 +3,21 @@ import { Redirect, Tabs, router } from 'expo-router';
 import { View } from 'react-native';
 import { BreathFab } from '../../components/BreathFab';
 import { SyncIndicator } from '../../components/widgets';
+import { useNotificationSync } from '../../hooks/useNotificationSync';
 import { useSystemInsets } from '../../hooks/useSystemInsets';
 import { useTheme } from '../../lib/theme';
 import { useSession } from '../../state/session';
 
 export default function TabsLayout() {
   const status = useSession((s) => s.status);
+  if (status !== 'signedIn') return <Redirect href="/login" />;
+  return <SignedInTabs />;
+}
+
+function SignedInTabs() {
   const { c } = useTheme();
   const insets = useSystemInsets();
-  if (status !== 'signedIn') return <Redirect href="/login" />;
+  useNotificationSync();
 
   const headerRight = () => <SyncIndicator onPress={() => router.navigate('/profile')} />;
 
@@ -43,6 +49,14 @@ export default function TabsLayout() {
           options={{
             title: 'Daily Routine',
             tabBarIcon: ({ color, size }) => <Ionicons name="sunny-outline" color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="plan"
+          options={{
+            title: 'Plan',
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => <Ionicons name="leaf-outline" color={color} size={size} />,
           }}
         />
         <Tabs.Screen

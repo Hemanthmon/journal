@@ -7,13 +7,15 @@ import { Body, Button, Card, Chip, Divider, ErrorNote, LinkRow, Muted, Screen, S
 import { exportHabitsCsv, exportHabitDefinitionsCsv, exportJournalCsv, exportUrgesCsv } from '../../../data/exporter';
 import { describeError } from '../../../api/client';
 import { shareCsv } from '../../../lib/exportFiles';
-import { cancelReminder, remindersSupported, scheduleReminder } from '../../../lib/notifications';
+import { ensurePermission, remindersSupported } from '../../../lib/notifications';
 import { space } from '../../../lib/theme';
 import { usePrefs } from '../../../state/prefs';
 import { useCtx, useSession } from '../../../state/session';
 import { syncService, useSyncStore } from '../../../state/sync';
 
 const REMINDER_TIMES = ['08:00', '12:00', '19:00', '21:00', '22:00'];
+const MORNING_TIMES = ['06:00', '07:00', '07:30', '08:00', '09:00'];
+const EVENING_TIMES = ['20:00', '21:00', '21:30', '22:00', '23:00'];
 
 function timeAgo(iso: string | null) {
   if (!iso) return 'never';
@@ -60,19 +62,17 @@ export default function Profile() {
     }
   };
 
-  const setReminder = async (enabled: boolean, time = prefs.reminderTime) => {
+  /** Turning a notification on asks for permission first; scheduling follows the prefs. */
+  const setNotify = async (patch: Partial<typeof prefs>, turningOn: boolean) => {
     setError(null);
-    if (enabled) {
-      const ok = await scheduleReminder(time);
-      if (!ok) {
-        setError('Notifications are turned off for this app in your phone settings.');
-        return;
-      }
-    } else {
-      await cancelReminder();
+    if (turningOn && !(await ensurePermission())) {
+      setError('Notifications are turned off for this app in your phone settings.');
+      return;
     }
-    await prefs.set({ reminderEnabled: enabled, reminderTime: time });
+    await prefs.set(patch);
   };
+  const setReminder = (enabled: boolean, time = prefs.reminderTime) =>
+    setNotify({ reminderEnabled: enabled, reminderTime: time }, enabled);
 
   const syncText =
     sync.phase === 'syncing'
@@ -193,6 +193,40 @@ export default function Profile() {
               <Chip key={t} label={formatTime12(t)} selected={prefs.reminderTime === t} onPress={() => void setReminder(true, t)} />
             ))}
           </View>
+        )}
+        {remindersSupported && (
+          <>
+            <ToggleRow
+              label="Planned task reminders"
+              hint="A nudge at the time you set on a planner task."
+              value={prefs.planTaskReminders}
+              onChange={(v) => void setNotify({ planTaskReminders: v }, v)}
+            />
+            <ToggleRow
+              label="Morning: plan your day"
+              value={prefs.planMorningEnabled}
+              onChange={(v) => void setNotify({ planMorningEnabled: v }, v)}
+            />
+            {prefs.planMorningEnabled && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {MORNING_TIMES.map((t) => (
+                  <Chip key={t} label={formatTime12(t)} selected={prefs.planMorningTime === t} onPress={() => void prefs.set({ planMorningTime: t })} />
+                ))}
+              </View>
+            )}
+            <ToggleRow
+              label="Evening: tick off your plan"
+              value={prefs.planEveningEnabled}
+              onChange={(v) => void setNotify({ planEveningEnabled: v }, v)}
+            />
+            {prefs.planEveningEnabled && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {EVENING_TIMES.map((t) => (
+                  <Chip key={t} label={formatTime12(t)} selected={prefs.planEveningTime === t} onPress={() => void prefs.set({ planEveningTime: t })} />
+                ))}
+              </View>
+            )}
+          </>
         )}
         <Divider />
         <Body style={{ fontWeight: '600' }}>Privacy</Body>

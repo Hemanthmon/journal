@@ -24,6 +24,10 @@ export const journalAnswerId = (userId: string, localDate: string, questionId: s
 export const defaultEmotionId = (userId: string, name: string) =>
   uuidv5(`${userId}:emotion:${name.toLowerCase()}`, APP_NAMESPACE);
 
+/** Id for the one weekly or monthly review of a period. */
+export const planReviewId = (userId: string, level: 'week' | 'month', periodStart: string) =>
+  uuidv5(`${userId}:plan-review:${level}:${periodStart}`, APP_NAMESPACE);
+
 export function uuidv5(name: string, namespace: string): string {
   const ns = parseUuid(namespace);
   const nameBytes = utf8(name);
