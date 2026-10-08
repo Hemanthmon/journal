@@ -31,14 +31,15 @@ export default function Plan() {
   const [view, setView] = useState<View_>('day');
   const [today, setToday] = useState(toLocalDate());
   const [date, setDate] = useState(today);
+  // A new day while the app stayed open: jump to it.
   useFocusEffect(
     useCallback(() => {
       const t = toLocalDate();
-      setToday((prev) => {
-        if (prev !== t) setDate(t);
-        return t;
-      });
-    }, []),
+      if (t !== today) {
+        setToday(t);
+        setDate(t);
+      }
+    }, [today]),
   );
 
   return (
