@@ -23,6 +23,25 @@ export const verifyCodeSchema = z
   .strict();
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>;
 
+/** The owner shares their dashboard with someone from the app. */
+export const shareDashboardSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Enter their name').max(100, 'Name is too long'),
+    email: emailSchema,
+  })
+  .strict();
+export type ShareDashboardInput = z.infer<typeof shareDashboardSchema>;
+
+/** Someone who can currently see the owner's dashboard. */
+export interface DashboardViewer {
+  id: string;
+  email: string;
+  name: string | null;
+  /** Granted by DASHBOARD_VIEWER_EMAIL on the server; can't be removed from the app. */
+  managedByServer: boolean;
+  grantedAt: string;
+}
+
 /** Optional inclusive local-date range; a missing bound means "from the first record" / "to today". */
 export const dashboardRangeSchema = dateRangeQuerySchema;
 

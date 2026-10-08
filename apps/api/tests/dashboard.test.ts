@@ -7,8 +7,8 @@ import { habitLogId, dailyRoutineId, journalAnswerId, type PullResponse } from '
 import { config } from '../src/config/env';
 import { getPool } from '../src/db/pool';
 import { syncEnvAccess } from '../src/modules/dashboard/access';
-import { setMailer } from '../src/modules/dashboard/mailer';
-import { bearer, makeApi, registerUser } from './helpers';
+import { inviteMessage, loginCodeMessage, setMailer, type InviteEmail, type LoginCodeEmail } from '../src/modules/dashboard/mailer';
+import { bearer, makeApi, registerUser, uniqueEmail } from './helpers';
 
 /**
  * Read-only web dashboard: email-code login, session protection, analytics, date
@@ -19,10 +19,14 @@ import { bearer, makeApi, registerUser } from './helpers';
 const api = makeApi();
 const VIEWER = config.dashboard.viewerEmail;
 const OWNER = config.dashboard.ownerEmail;
-const sent: { to: string; code: string }[] = [];
+const sent: ({ to: string } & LoginCodeEmail)[] = [];
+const invites: ({ to: string } & InviteEmail)[] = [];
 setMailer({
-  async sendLoginCode(to, code) {
-    sent.push({ to, code });
+  async sendLoginCode(to, mail) {
+    sent.push({ to, ...mail });
+  },
+  async sendInvite(to, mail) {
+    invites.push({ to, ...mail });
   },
 });
 
@@ -262,6 +266,80 @@ describe('dashboard API protection', () => {
     const res = await api.post('/api/dashboard/auth/logout');
     expect(res.status).toBe(204);
     expect((res.headers['set-cookie'] as unknown as string[])[0]).toContain('Max-Age=0');
+  });
+});
+
+describe('sharing the dashboard from the app', () => {
+  const friend = uniqueEmail();
+  const access = '/api/dashboard-access';
+
+  it('requires the app login', async () => {
+    expect((await api.get(access)).status).toBe(401);
+    expect((await api.post(access).send({ name: 'Priya', email: friend })).status).toBe(401);
+  });
+
+  it('validates the name and email', async () => {
+    expect((await api.post(access).set(ownerAuth).send({ name: ' ', email: friend })).status).toBe(400);
+    expect((await api.post(access).set(ownerAuth).send({ name: 'Priya', email: 'nope' })).status).toBe(400);
+  });
+
+  it('shares with a named person, invites them once, and lets them sign in by email code', async () => {
+    const res = await api.post(access).set(ownerAuth).send({ name: 'Priya Sharma', email: friend.toUpperCase() });
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ email: friend, name: 'Priya Sharma', managedByServer: false });
+    expect(invites.at(-1)).toMatchObject({ to: friend, viewerName: 'Priya Sharma', ownerName: 'Owner' });
+    expect(invites.at(-1)!.dashboardUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
+
+    // Sharing again only renames; no second invitation.
+    const before = invites.length;
+    const again = await api.post(access).set(ownerAuth).send({ name: 'Priya', email: friend });
+    expect(again.status).toBe(200);
+    expect(again.body.data.name).toBe('Priya');
+    expect(invites.length).toBe(before);
+
+    const list = (await api.get(access).set(ownerAuth)).body.data as { email: string; managedByServer: boolean }[];
+    expect(list.map((v) => [v.email, v.managedByServer])).toEqual(expect.arrayContaining([[VIEWER, true], [friend, false]]));
+
+    const { code } = await requestCode(friend);
+    expect(sent.at(-1)).toMatchObject({ to: friend, viewerName: 'Priya', ownerName: 'Owner' });
+    const login = await api.post('/api/dashboard/auth/verify-code').send({ email: friend, code });
+    expect(login.status).toBe(200);
+    const cookie = (login.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+    expect((await api.get('/api/dashboard/me').set('Cookie', cookie)).body.data.ownerName).toBe('Owner');
+  });
+
+  it("keeps each owner's list private and only the owner can remove someone", async () => {
+    const other = await registerUser(api, { email: uniqueEmail(), name: 'Other', timezone: 'UTC' });
+    const otherAuth = bearer(other.tokens.accessToken);
+    expect((await api.get(access).set(otherAuth)).body.data).toEqual([]);
+    const list = (await api.get(access).set(ownerAuth)).body.data as { id: string; email: string }[];
+    const grant = list.find((v) => v.email === friend)!;
+    expect((await api.delete(`${access}/${grant.id}`).set(otherAuth)).status).toBe(404);
+    const envGrant = list.find((v) => v.email === VIEWER)!;
+    expect((await api.delete(`${access}/${envGrant.id}`).set(ownerAuth)).status).toBe(409);
+  });
+
+  it('ends access immediately when the owner removes someone', async () => {
+    const { code } = await requestCode(friend);
+    const login = await api.post('/api/dashboard/auth/verify-code').send({ email: friend, code });
+    const cookie = (login.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+    const grant = ((await api.get(access).set(ownerAuth)).body.data as { id: string; email: string }[]).find((v) => v.email === friend)!;
+    expect((await api.delete(`${access}/${grant.id}`).set(ownerAuth)).status).toBe(204);
+    expect((await api.get('/api/dashboard/me').set('Cookie', cookie)).status).toBe(401);
+    expect((await requestCode(friend)).code).toBeUndefined();
+    expect(((await api.get(access).set(ownerAuth)).body.data as { email: string }[]).some((v) => v.email === friend)).toBe(false);
+  });
+});
+
+describe('dashboard emails', () => {
+  it('escapes names and shows the code', () => {
+    const msg = loginCodeMessage({ code: '482916', minutesValid: 10, viewerName: '<b>Eve</b>', ownerName: 'Sam <script>' });
+    expect(msg.html).not.toMatch(/<b>Eve|<script>/);
+    expect(msg.html).toContain('&lt;b&gt;Eve');
+    expect(msg.text).toContain('482916');
+    const invite = inviteMessage({ viewerName: 'Ana', ownerName: 'Sam Lee', dashboardUrl: 'https://x.test/?a="b"' }, 'ana@example.com');
+    expect(invite.subject).toBe('Sam shared their journal with you 🌿');
+    expect(invite.html).toContain('href="https://x.test/?a=&quot;b&quot;"');
   });
 });
 

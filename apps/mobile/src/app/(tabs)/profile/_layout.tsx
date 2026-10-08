@@ -27,6 +27,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="account" options={{ title: 'Edit profile' }} />
       <Stack.Screen name="reauth" options={{ title: 'Sign in again' }} />
       <Stack.Screen name="data" options={{ title: 'Delete data' }} />
+      <Stack.Screen name="sharing" options={{ title: 'Dashboard access' }} />
       <Stack.Screen name="habits/index" options={{ title: 'Manage habits' }} />
       <Stack.Screen name="habits/[id]" options={{ title: 'Habit' }} />
       <Stack.Screen name="questions/index" options={{ title: 'Manage questions' }} />

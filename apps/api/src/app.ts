@@ -10,6 +10,7 @@ import { requestLogger, requireHttps } from './middleware/security';
 import { accountRouter } from './modules/account/routes';
 import { authRouter } from './modules/auth/routes';
 import { dashboardRouter } from './modules/dashboard/routes';
+import { dashboardSharingRouter } from './modules/dashboard/sharing';
 import { dailyRoutinesRouter } from './modules/dailyRoutines/routes';
 import { habitLogsRouter } from './modules/habitLogs/routes';
 import { habitsRouter } from './modules/habits/routes';
@@ -54,6 +55,7 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/daily-routines', authenticate, dailyRoutinesRouter());
   app.use('/api/urges', authenticate, urgesRouter());
   app.use('/api/sync', authenticate, syncRouter());
+  app.use('/api/dashboard-access', authenticate, dashboardSharingRouter());
 
   // Read-only web dashboard API (its own email-code sessions; see modules/dashboard).
   app.use('/api/dashboard', dashboardRouter({ rateLimitMax: opts.authRateLimitMax ?? config.auth.rateLimitMax }));

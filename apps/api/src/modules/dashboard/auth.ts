@@ -165,8 +165,17 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
         );
         return c;
       });
-      // Not awaited: the response must not take longer for authorised emails.
-      if (code) getMailer().sendLoginCode(email, code, CODE_TTL_MINUTES).catch(logMailFailure);
+      if (code) {
+        const [owners] = await getPool().execute<Row[]>('SELECT name FROM users WHERE id = ?', [grant.ownerUserId]);
+        const mail = {
+          code,
+          minutesValid: CODE_TTL_MINUTES,
+          viewerName: grant.viewerName,
+          ownerName: String(owners[0]?.name ?? 'Your friend'),
+        };
+        // Not awaited: the response must not take longer for authorised emails.
+        getMailer().sendLoginCode(email, mail).catch(logMailFailure);
+      }
     }
     res.json({ data: { message: 'If this email has dashboard access, a sign-in code is on its way.' } });
   });

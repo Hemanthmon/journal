@@ -36,8 +36,9 @@ const envSchema = z.object({
   TRUST_PROXY: boolish,
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 
-  // Read-only web dashboard. The viewer logs in with an emailed one-time code and sees the
-  // owner's records. Leave the emails empty to disable dashboard access.
+  // Read-only web dashboard. A viewer logs in with an emailed one-time code and sees the
+  // owner's records. Owners share access from the app; DASHBOARD_VIEWER_EMAIL additionally
+  // grants one viewer from the server. Leave the session secret empty to disable it.
   DASHBOARD_VIEWER_EMAIL: z.string().trim().toLowerCase().default(''),
   DASHBOARD_OWNER_EMAIL: z.string().trim().toLowerCase().default(''),
   DASHBOARD_SESSION_SECRET: z.string().default(''),
@@ -63,7 +64,7 @@ if (env.NODE_ENV === 'production' && env.BCRYPT_ROUNDS < 12) {
 }
 
 // DASHBOARD_OWNER_EMAIL is optional: when empty, the only account in the database is the owner.
-const dashboardEnabled = !!env.DASHBOARD_VIEWER_EMAIL;
+const dashboardEnabled = !!env.DASHBOARD_SESSION_SECRET || !!env.DASHBOARD_VIEWER_EMAIL;
 if (dashboardEnabled) {
   if (env.DASHBOARD_SESSION_SECRET.length < 32) {
     throw new Error('DASHBOARD_SESSION_SECRET must be at least 32 characters when the dashboard is enabled');
