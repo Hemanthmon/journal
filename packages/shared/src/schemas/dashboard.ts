@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { Weekday } from '../schedule';
 import { emailSchema } from './auth';
-import { dateRangeQuerySchema } from './common';
+import { dateRangeQuerySchema, idSchema, localDateSchema, localTimeSchema } from './common';
+import { BLOCK_COLORS, type BlockColor } from './planner';
 import type { MeasurementType } from './habits';
 import type { QuestionType } from './questions';
 
@@ -56,6 +57,8 @@ export interface ResolvedRange {
 
 export interface DashboardMe {
   viewerEmail: string;
+  /** Signed in to their own dashboard: may add and edit calendar blocks. */
+  isOwner: boolean;
   ownerName: string;
   timezone: string;
   /** Today in the owner's time zone. */
@@ -369,4 +372,56 @@ export interface DashboardPlanner {
   missedYesterday: string[];
   /** Newest first, at most 8. */
   reviews: PlannerReview[];
+}
+
+// ------------------------------------------------------------------ calendar
+
+/** The owner adds or edits a block from the website. */
+export const blockInputSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Give the block a name').max(200, 'Keep it under 200 characters'),
+    localDate: localDateSchema,
+    startTime: localTimeSchema,
+    endTime: localTimeSchema,
+    color: z.enum(BLOCK_COLORS),
+    identityId: idSchema.nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine((b) => b.endTime > b.startTime, { message: 'The block must end after it starts', path: ['endTime'] });
+export type BlockInput = z.input<typeof blockInputSchema>;
+
+export interface CalendarBlock {
+  id: string;
+  title: string;
+  date: string;
+  /** "HH:MM" */
+  start: string;
+  end: string;
+  color: BlockColor;
+  identityId: string | null;
+  identity: string | null;
+  notes: string | null;
+}
+
+export interface CalendarTask {
+  id: string;
+  title: string;
+  date: string;
+  /** "HH:MM" */
+  time: string;
+  done: boolean;
+  identity: string | null;
+}
+
+export interface DashboardCalendar {
+  from: string;
+  to: string;
+  today: string;
+  canEdit: boolean;
+  blocks: CalendarBlock[];
+  /** Planner tasks with a time, shown as task blocks. */
+  tasks: CalendarTask[];
+  identities: { id: string; statement: string }[];
+  google: { connected: boolean; lastSyncAt: string | null };
 }

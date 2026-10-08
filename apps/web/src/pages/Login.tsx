@@ -50,7 +50,7 @@ export function Login() {
       <div className="card login">
         <h1>Journal dashboard</h1>
         <p className="muted" style={{ margin: 0 }}>
-          A private, read-only view of routine, journal and urge-tracking records.
+          A private view of routine, journal, planner and urge-tracking records. Sign in with the email the journal was shared with, or your own app email.
         </p>
         {step === 'email' ? (
           <form className="stack" onSubmit={requestCode}>

@@ -1,9 +1,10 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { dashboardRangeSchema, localDateSchema, type DashboardMe } from '@journal/shared';
-import { notFound } from '../../lib/errors';
+import { addDays, blockInputSchema, dashboardRangeSchema, ErrorCode, localDateSchema, weekStartOf, type BlockInput, type DashboardMe } from '@journal/shared';
+import { AppError, notFound } from '../../lib/errors';
 import { localDateIn } from '../../lib/tz';
 import { requireIdParam } from '../../lib/rows';
-import { validateQuery } from '../../middleware/validate';
+import { validateBody, validateQuery } from '../../middleware/validate';
+import { calendarView, createBlockFor, deleteBlockFor, updateBlockFor } from '../calendar/blocks';
 import { Analyzer, firstDataDate, resolveRange } from './analytics';
 import { dashboardAuthRouter, requireDashboard, type DashboardContext } from './auth';
 import { loadOwnerData } from './data';
@@ -47,6 +48,7 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
     const data = await loadOwnerData(c);
     const me: DashboardMe = {
       viewerEmail: c.viewerEmail,
+      isOwner: c.isOwner,
       ownerName: c.ownerName,
       timezone: c.timezone,
       today: data.today,
@@ -94,6 +96,38 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
     const today = localDateIn(new Date(), c.timezone);
     const q = typeof req.query.date === 'string' && localDateSchema.safeParse(req.query.date).success ? req.query.date : today;
     res.json({ data: buildPlanner(await loadPlannerData(c.ownerUserId), today, q) });
+  });
+
+  /** Blocks and timed tasks between ?from and ?to (default: the owner's current week). */
+  router.get('/calendar', range, async (req, res) => {
+    const c = ctx(req);
+    const today = localDateIn(new Date(), c.timezone);
+    const q = (res.locals.query ?? {}) as { from?: string; to?: string };
+    const from = q.from ?? weekStartOf(today);
+    const to = q.to ?? addDays(from, 6);
+    if (to > addDays(from, 62)) throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Choose at most two months at a time');
+    res.json({ data: await calendarView(c.ownerUserId, { from, to, today, canEdit: c.isOwner }) });
+  });
+
+  // Calendar blocks are the one thing the owner can change from the website.
+  const ownerOnly = (req: Request, _res: Response, next: NextFunction) => {
+    if (!ctx(req).isOwner) return next(new AppError(403, ErrorCode.FORBIDDEN, 'Only the owner can change the calendar'));
+    next();
+  };
+
+  router.post('/blocks', ownerOnly, validateBody(blockInputSchema), async (req, res) => {
+    const b = await createBlockFor(ctx(req).ownerUserId, req.body as BlockInput);
+    res.status(201).json({ data: { id: b.id } });
+  });
+
+  router.put('/blocks/:id', requireIdParam, ownerOnly, validateBody(blockInputSchema), async (req, res) => {
+    const b = await updateBlockFor(ctx(req).ownerUserId, req.params.id as string, req.body as BlockInput);
+    res.json({ data: { id: b.id } });
+  });
+
+  router.delete('/blocks/:id', requireIdParam, ownerOnly, async (req, res) => {
+    await deleteBlockFor(ctx(req).ownerUserId, req.params.id as string);
+    res.status(204).end();
   });
 
   router.get('/export.xlsx', range, async (req, res) => {

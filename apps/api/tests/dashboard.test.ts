@@ -132,8 +132,8 @@ describe('dashboard login (email code)', () => {
     expect(rows[0]?.n).toBe(0);
   });
 
-  it('does not let the owner app account or a random user sign in', async () => {
-    for (const email of [OWNER, 'random@example.com']) {
+  it('does not let an email without an account or access sign in', async () => {
+    for (const email of ['random@example.com']) {
       const { code } = await requestCode(email);
       expect(code).toBeUndefined();
       const res = await api.post('/api/dashboard/auth/verify-code').send({ email, code: '123456' });

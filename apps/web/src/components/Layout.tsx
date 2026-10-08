@@ -9,6 +9,7 @@ const NAV = [
   { to: '/habits', label: 'Habits', icon: '✓', end: false },
   { to: '/journal', label: 'Routine & Journal', icon: '✎', end: false },
   { to: '/planner', label: 'Planner', icon: '❦', end: false },
+  { to: '/calendar', label: 'Calendar', icon: '▦', end: false },
   { to: '/urges', label: 'Urge Tracker', icon: '〰', end: false },
 ];
 
@@ -92,7 +93,15 @@ export function Layout() {
         ))}
         <div className="sidebar-foot">
           <span>
-            Viewing <strong>{me.ownerName}</strong> · read-only
+            {me.isOwner ? (
+              <>
+                <strong>Your dashboard</strong> · you can edit the calendar
+              </>
+            ) : (
+              <>
+                Viewing <strong>{me.ownerName}</strong> · read-only
+              </>
+            )}
           </span>
           <span>{me.viewerEmail}</span>
           <ThemeSelect />

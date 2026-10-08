@@ -11,7 +11,7 @@ import { withTransaction } from '../../db/tx';
 import { AppError } from '../../lib/errors';
 import { safeTimeZone } from '../../lib/tz';
 import { validateBody } from '../../middleware/validate';
-import { findActiveGrant, findGrantById } from './access';
+import { findActiveGrant, findGrantById, type AccessGrant } from './access';
 import { getMailer, logMailFailure } from './mailer';
 
 /**
@@ -63,11 +63,14 @@ export function sessionCookie(token: string, maxAgeSeconds: number): string {
   return attrs.join('; ');
 }
 
-function issueSession(res: Response, grantId: string, viewerEmail: string) {
+/** A viewer session names its grant (`gid`); the owner's own session names the user (`own`). */
+type SessionClaims = { gid: string } | { own: string };
+
+function issueSession(res: Response, claims: SessionClaims, email: string) {
   const maxAge = config.dashboard.sessionHours * 3600;
-  const token = jwt.sign({ typ: 'dashboard', gid: grantId }, config.dashboard.sessionSecret, {
+  const token = jwt.sign({ typ: 'dashboard', ...claims }, config.dashboard.sessionSecret, {
     algorithm: 'HS256',
-    subject: viewerEmail,
+    subject: email,
     audience: AUDIENCE,
     issuer: ISSUER,
     expiresIn: maxAge,
@@ -86,11 +89,32 @@ function readCookie(req: Request, name: string): string | undefined {
 }
 
 export interface DashboardContext {
-  grantId: string;
+  /** null for the owner's own session. */
+  grantId: string | null;
   viewerEmail: string;
   ownerUserId: string;
   ownerName: string;
   timezone: string;
+  /** The owner signed in to their own dashboard: may add and edit calendar blocks. */
+  isOwner: boolean;
+}
+
+/**
+ * Who an email signs in as: a viewer with an active grant, or else the owner of an app
+ * account with that email (their own dashboard). A grant wins, so a friend who also uses
+ * the app still sees the journal that was shared with them.
+ */
+type Principal =
+  | { kind: 'viewer'; grant: AccessGrant }
+  | { kind: 'owner'; userId: string; name: string };
+
+async function findPrincipal(email: string): Promise<Principal | undefined> {
+  if (!config.dashboard.enabled) return undefined;
+  const grant = await findActiveGrant(getPool(), email);
+  if (grant) return { kind: 'viewer', grant };
+  const [users] = await getPool().execute<Row[]>('SELECT id, name FROM users WHERE email = ?', [email]);
+  const u = users[0];
+  return u ? { kind: 'owner', userId: String(u.id), name: String(u.name) } : undefined;
 }
 
 /** Requires a valid dashboard session whose grant is still active. */
@@ -104,29 +128,45 @@ export async function requireDashboard(req: Request, res: Response, next: NextFu
       audience: AUDIENCE,
       issuer: ISSUER,
     });
-    if (typeof p === 'string' || p.typ !== 'dashboard' || typeof p.gid !== 'string' || typeof p.sub !== 'string') {
-      throw new Error('bad payload');
-    }
-    payload = p;
+    const valid =
+      typeof p !== 'string' &&
+      p.typ === 'dashboard' &&
+      typeof p.sub === 'string' &&
+      (typeof p.gid === 'string' || typeof p.own === 'string');
+    if (!valid) throw new Error('bad payload');
+    payload = p as jwt.JwtPayload;
   } catch {
     return next(new AppError(401, ErrorCode.UNAUTHENTICATED, 'Your session has ended. Please sign in again.'));
   }
-  const grant = await findGrantById(getPool(), payload.gid as string);
-  if (!grant || grant.viewerEmail !== payload.sub) {
-    return next(new AppError(401, ErrorCode.UNAUTHENTICATED, 'Access to this dashboard has ended.'));
+  const ended = () => next(new AppError(401, ErrorCode.UNAUTHENTICATED, 'Access to this dashboard has ended.'));
+  let claims: SessionClaims;
+  let ownerUserId: string;
+  let grantId: string | null = null;
+  if (typeof payload.gid === 'string') {
+    const grant = await findGrantById(getPool(), payload.gid);
+    if (!grant || grant.viewerEmail !== payload.sub) return ended();
+    claims = { gid: grant.id };
+    ownerUserId = grant.ownerUserId;
+    grantId = grant.id;
+  } else {
+    claims = { own: String(payload.own) };
+    ownerUserId = String(payload.own);
   }
-  const [owners] = await getPool().execute<Row[]>('SELECT name, timezone FROM users WHERE id = ?', [grant.ownerUserId]);
+  const [owners] = await getPool().execute<Row[]>('SELECT email, name, timezone FROM users WHERE id = ?', [ownerUserId]);
   const owner = owners[0];
-  if (!owner) return next(new AppError(401, ErrorCode.UNAUTHENTICATED, 'Access to this dashboard has ended.'));
+  if (!owner) return ended();
+  // The owner's session ends if the account's email changes.
+  if (!grantId && owner.email !== payload.sub) return ended();
   req.dashboard = {
-    grantId: grant.id,
-    viewerEmail: grant.viewerEmail,
-    ownerUserId: grant.ownerUserId,
+    grantId,
+    viewerEmail: String(payload.sub),
+    ownerUserId,
     ownerName: String(owner.name),
     timezone: safeTimeZone(String(owner.timezone)),
+    isOwner: !grantId,
   };
   if (typeof payload.iat !== 'number' || Date.now() / 1000 - payload.iat >= RENEW_AFTER_SECONDS) {
-    issueSession(res, grant.id, grant.viewerEmail);
+    issueSession(res, claims, String(payload.sub));
   }
   next();
 }
@@ -144,8 +184,8 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
 
   router.post('/request-code', validateBody(requestCodeSchema), async (req, res) => {
     const email = req.body.email as string;
-    const grant = config.dashboard.enabled ? await findActiveGrant(getPool(), email) : undefined;
-    if (grant) {
+    const who = await findPrincipal(email);
+    if (who) {
       const now = new Date();
       const code = await withTransaction(async (conn) => {
         const [recent] = await conn.execute<Row[]>(
@@ -166,13 +206,13 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
         return c;
       });
       if (code) {
-        const [owners] = await getPool().execute<Row[]>('SELECT name FROM users WHERE id = ?', [grant.ownerUserId]);
-        const mail = {
-          code,
-          minutesValid: CODE_TTL_MINUTES,
-          viewerName: grant.viewerName,
-          ownerName: String(owners[0]?.name ?? 'Your friend'),
-        };
+        let mail;
+        if (who.kind === 'viewer') {
+          const [owners] = await getPool().execute<Row[]>('SELECT name FROM users WHERE id = ?', [who.grant.ownerUserId]);
+          mail = { code, minutesValid: CODE_TTL_MINUTES, viewerName: who.grant.viewerName, ownerName: String(owners[0]?.name ?? 'Your friend') };
+        } else {
+          mail = { code, minutesValid: CODE_TTL_MINUTES, viewerName: who.name, ownerName: who.name };
+        }
         // Not awaited: the response must not take longer for authorised emails.
         getMailer().sendLoginCode(email, mail).catch(logMailFailure);
       }
@@ -182,8 +222,8 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
 
   router.post('/verify-code', validateBody(verifyCodeSchema), async (req, res) => {
     const { email, code } = req.body as { email: string; code: string };
-    const grant = config.dashboard.enabled ? await findActiveGrant(getPool(), email) : undefined;
-    if (!grant) throw invalidCode();
+    const who = await findPrincipal(email);
+    if (!who) throw invalidCode();
 
     const now = new Date();
     const ok = await withTransaction(async (conn) => {
@@ -214,7 +254,8 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
     });
     if (!ok) throw invalidCode();
 
-    issueSession(res, grant.id, grant.viewerEmail);
+    if (who.kind === 'viewer') issueSession(res, { gid: who.grant.id }, who.grant.viewerEmail);
+    else issueSession(res, { own: who.userId }, email);
     res.json({ data: { signedIn: true } });
   });
 
