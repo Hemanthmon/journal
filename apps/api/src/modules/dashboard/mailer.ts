@@ -30,9 +30,20 @@ const brevoMailer: Mailer = {
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!res.ok) throw new Error(`Email provider responded ${res.status}`);
+    if (!res.ok) {
+      // Brevo errors look like {"code":"unauthorized","message":"..."}; keep only the code.
+      const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+      throw new MailProviderError(res.status, typeof body?.code === 'string' ? body.code : undefined);
+    }
   },
 };
+
+class MailProviderError extends Error {
+  constructor(readonly status: number, readonly providerCode?: string) {
+    super(`Email provider responded ${status}`);
+    this.name = 'MailProviderError';
+  }
+}
 
 const consoleMailer: Mailer = {
   async sendLoginCode(to, code, minutes) {
@@ -54,5 +65,9 @@ export function setMailer(m: Mailer): void {
 }
 
 export function logMailFailure(err: unknown) {
+  if (err instanceof MailProviderError) {
+    logger.error('login_code_email_failed', { errorName: err.name, status: err.status, providerCode: err.providerCode });
+    return;
+  }
   logger.error('login_code_email_failed', { errorName: err instanceof Error ? err.name : typeof err });
 }
