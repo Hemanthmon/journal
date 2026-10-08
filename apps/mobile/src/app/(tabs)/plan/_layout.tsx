@@ -25,6 +25,7 @@ export default function PlanLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Plan', headerRight: () => <SyncIndicator /> }} />
       <Stack.Screen name="task" options={{ title: 'Task' }} />
+      <Stack.Screen name="block" options={{ title: 'Block' }} />
       <Stack.Screen name="identities" options={{ title: "Who I'm becoming" }} />
       <Stack.Screen name="review" options={{ title: 'Review' }} />
     </Stack>

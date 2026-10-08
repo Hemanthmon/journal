@@ -14,10 +14,12 @@ import {
   planGoalRecordSchema,
   planReviewRecordSchema,
   planTaskRecordSchema,
+  timeBlockRecordSchema,
   type IdentityRecord,
   type PlanGoalRecord,
   type PlanReviewRecord,
   type PlanTaskRecord,
+  type TimeBlockRecord,
 } from './schemas/planner';
 import { reminderRecordSchema, type ReminderRecord } from './schemas/reminders';
 import { urgeRecordSchema, type UrgeRecord } from './schemas/urges';
@@ -227,6 +229,21 @@ export const ENTITIES = {
     // One per period (deterministic id), so a removed review can be written again.
     stickyDelete: false,
   },
+  timeBlocks: {
+    table: 'time_blocks',
+    fields: [
+      ...BASE_FIELDS,
+      f('title', 'title', 'string'),
+      f('localDate', 'local_date', 'date'),
+      f('startTime', 'start_time', 'time'),
+      f('endTime', 'end_time', 'time'),
+      f('color', 'color', 'string'),
+      f('identityId', 'identity_id', 'string'),
+      f('notes', 'notes', 'string'),
+    ],
+    schema: timeBlockRecordSchema,
+    stickyDelete: true,
+  },
 } satisfies Record<string, EntityDef>;
 
 export type EntityName = keyof typeof ENTITIES;
@@ -245,6 +262,7 @@ export const ENTITY_ORDER: EntityName[] = [
   'planGoals',
   'planTasks',
   'planReviews',
+  'timeBlocks',
 ];
 
 export interface EntityRecordMap {
@@ -260,6 +278,7 @@ export interface EntityRecordMap {
   planGoals: PlanGoalRecord;
   planTasks: PlanTaskRecord;
   planReviews: PlanReviewRecord;
+  timeBlocks: TimeBlockRecord;
 }
 
 export type AnyRecord = EntityRecordMap[EntityName];

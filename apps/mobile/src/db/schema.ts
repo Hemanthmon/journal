@@ -237,6 +237,21 @@ const MIGRATIONS: string[] = [
     ${SYNC_COLUMNS}
   );
   `,
+  `
+  -- Calendar time blocks.
+  CREATE TABLE IF NOT EXISTS time_blocks (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    local_date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    color TEXT NOT NULL,
+    identity_id TEXT,
+    notes TEXT,
+    ${SYNC_COLUMNS}
+  );
+  CREATE INDEX IF NOT EXISTS ix_time_blocks_date ON time_blocks (local_date);
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {
@@ -264,6 +279,7 @@ export const DATA_TABLES = [
   'plan_goals',
   'plan_tasks',
   'plan_reviews',
+  'time_blocks',
   'outbox',
   'conflicts',
   'sync_state',

@@ -123,3 +123,25 @@ export const planReviewRecordSchema = z
   })
   .superRefine(checkPeriod);
 export type PlanReviewRecord = z.output<typeof planReviewRecordSchema>;
+
+/** Calm colour names for calendar blocks; each app maps them to its own palette. */
+export const BLOCK_COLORS = ['sage', 'sky', 'lavender', 'peach', 'rose', 'sand'] as const;
+export type BlockColor = (typeof BLOCK_COLORS)[number];
+
+/**
+ * A time block on the calendar, like a Google Calendar event: "Deep work 9–11 AM".
+ * Blocks can come from the app, the website, or (when connected) Google Calendar.
+ */
+export const timeBlockRecordSchema = z
+  .object({
+    ...baseRecordShape,
+    title: z.string().trim().min(1, 'Give the block a name').max(200, 'Keep it under 200 characters'),
+    localDate: localDateSchema,
+    startTime: localTimeSchema,
+    endTime: localTimeSchema,
+    color: z.enum(BLOCK_COLORS),
+    identityId: idSchema.nullable(),
+    notes: optionalText(2000),
+  })
+  .refine((b) => b.endTime > b.startTime, { message: 'The block must end after it starts', path: ['endTime'] });
+export type TimeBlockRecord = z.output<typeof timeBlockRecordSchema>;

@@ -5,6 +5,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { describeError } from '../../../api/client';
 import { PeriodNav, Tally, TaskRow, VotesList, identityLabel, monthLabel, weekLabel } from '../../../components/planner';
+import { Timeline } from '../../../components/Timeline';
+import { timelineFor } from '../../../data/blocks';
 import { Body, Button, Card, Chip, EmptyState, ErrorNote, Field, Loading, Muted, ProgressBar, Screen, SectionTitle, Segmented } from '../../../components/ui';
 import {
   carryOver,
@@ -89,17 +91,19 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
   const { c } = useTheme();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'timeline' | 'list'>('timeline');
   const weekStart = weekStartOf(date);
   const { data, isLoading } = useQuery({
     queryKey: ['plan-day', date, today],
     queryFn: async () => {
-      const [tasks, identities, missed, votes] = await Promise.all([
+      const [tasks, identities, missed, votes, timeline] = await Promise.all([
         tasksForDate(ctx, date),
         listIdentities(ctx, { includeArchived: true }),
         date === today ? missedYesterday(ctx, today) : Promise.resolve([]),
         identityVotes(ctx, weekStart, addDays(weekStart, 6)),
+        timelineFor(ctx, date),
       ]);
-      return { tasks, identities, missed, votes };
+      return { tasks, identities, missed, votes, timeline };
     },
   });
   if (isLoading || !data) return <Loading />;
@@ -145,7 +149,40 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
         </Card>
       )}
 
-      <Card>
+      <Segmented
+        options={[
+          { value: 'timeline', label: 'Timeline' },
+          { value: 'list', label: 'Tasks' },
+        ]}
+        value={mode}
+        onChange={setMode}
+      />
+
+      {mode === 'timeline' && (
+        <Card>
+          <SectionTitle right={<Muted>Tap a time to add a block</Muted>}>Schedule</SectionTitle>
+          {error && <ErrorNote message={error} />}
+          {notice && <Text style={{ color: c.success, fontWeight: '600' }}>{notice}</Text>}
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <Button style={{ flex: 1 }} title="Block" icon="add" variant="secondary" onPress={() => router.push({ pathname: '/plan/block', params: { date } })} />
+            <Button style={{ flex: 1 }} title="Task" icon="add" variant="secondary" onPress={() => router.push({ pathname: '/plan/task', params: { date } })} />
+          </View>
+          <Timeline
+            items={data.timeline}
+            identities={ids}
+            nowMinutes={date === today ? new Date().getHours() * 60 + new Date().getMinutes() : null}
+            onPressEmpty={(start) => router.push({ pathname: '/plan/block', params: { date, start: String(start) } })}
+            onPressBlock={(id) => router.push({ pathname: '/plan/block', params: { id } })}
+            onPressTask={(id) => router.push({ pathname: '/plan/task', params: { id } })}
+            onToggleTask={(id) => void toggle(id)}
+          />
+          {data.tasks.some((t) => !t.localTime) && (
+            <Muted>Tasks without a time are in the Tasks list.</Muted>
+          )}
+        </Card>
+      )}
+
+      {mode === 'list' && <Card>
         <SectionTitle right={data.tasks.length > 0 ? <Tally done={done} total={data.tasks.length} /> : undefined}>Tasks</SectionTitle>
         {error && <ErrorNote message={error} />}
         {notice && <Text style={{ color: c.success, fontWeight: '600' }}>{notice}</Text>}
@@ -167,7 +204,7 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
           ))
         )}
         <Button title="Add task" icon="add" onPress={() => router.push({ pathname: '/plan/task', params: { date } })} />
-      </Card>
+      </Card>}
 
       <Card>
         <SectionTitle>Votes this week</SectionTitle>
