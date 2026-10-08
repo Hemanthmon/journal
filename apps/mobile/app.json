@@ -30,7 +30,8 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      "@react-native-community/datetimepicker"
     ],
     "scheme": "journal",
     "extra": {

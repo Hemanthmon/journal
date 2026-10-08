@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { formatLongDate, from12Hour, localDateSchema, to12Hour, toLocalDate, type Meridiem } from '@journal/shared';
+import { localDateSchema, toLocalDate } from '@journal/shared';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { describeError } from '../../../api/client';
+import { DateField, TimeField } from '../../../components/DateTimeFields';
 import { identityLabel } from '../../../components/planner';
 import { Button, Card, Chip, ErrorNote, Field, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { createTask, deleteTask, getTask, listIdentities, updateTask, weekGoalsFor } from '../../../data/planner';
@@ -19,8 +20,7 @@ export default function TaskEditor() {
   const [date, setDate] = useState(params.date ?? toLocalDate());
   const [identityId, setIdentityId] = useState<string | null>(null);
   const [goalId, setGoalId] = useState<string | null>(null);
-  const [time, setTime] = useState('');
-  const [period, setPeriod] = useState<Meridiem>('AM');
+  const [time24, setTime24] = useState<string | null>(null);
   const [place, setPlace] = useState('');
   const [twoMinute, setTwoMinute] = useState('');
   const [loaded, setLoaded] = useState(isNew);
@@ -35,11 +35,7 @@ export default function TaskEditor() {
       setDate(t.localDate);
       setIdentityId(t.identityId);
       setGoalId(t.goalId);
-      if (t.localTime) {
-        const p = to12Hour(t.localTime.slice(0, 5));
-        setTime(p.time);
-        setPeriod(p.period);
-      }
+      setTime24(t.localTime ? t.localTime.slice(0, 5) : null);
       setPlace(t.place ?? '');
       setTwoMinute(t.twoMinute ?? '');
       setLoaded(true);
@@ -56,9 +52,6 @@ export default function TaskEditor() {
   });
 
   if (!loaded || !options) return <Loading />;
-
-  const time24 = time.trim() ? from12Hour(time, period) : null;
-  const timeOk = !time.trim() || time24 !== null;
 
   const save = async () => {
     setBusy(true);
@@ -100,15 +93,7 @@ export default function TaskEditor() {
     <Screen>
       <Card>
         <Field label="Task" value={title} onChangeText={setTitle} placeholder="e.g. Read 20 pages" maxLength={200} autoFocus={isNew} />
-        <Field
-          label="Day"
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          keyboardType="numbers-and-punctuation"
-          error={dateOk ? null : 'Use YYYY-MM-DD'}
-          hint={dateOk ? formatLongDate(date) : undefined}
-        />
+        <DateField label="Day" value={dateOk ? date : toLocalDate()} onChange={setDate} />
       </Card>
 
       <Card>
@@ -139,22 +124,7 @@ export default function TaskEditor() {
       <Card>
         <SectionTitle>Make it obvious</SectionTitle>
         <Muted>"I will [task] at [time] in [place]." You'll get a reminder at that time.</Muted>
-        <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Time (optional)"
-              value={time}
-              onChangeText={setTime}
-              placeholder="7:00"
-              keyboardType="numbers-and-punctuation"
-              error={timeOk ? null : 'Use h:mm, e.g. 7:30'}
-            />
-          </View>
-          <View accessibilityRole="radiogroup" accessibilityLabel="AM or PM" style={{ flexDirection: 'row', gap: space.sm, paddingTop: 22 }}>
-            <Chip label="AM" selected={period === 'AM'} onPress={() => setPeriod('AM')} />
-            <Chip label="PM" selected={period === 'PM'} onPress={() => setPeriod('PM')} />
-          </View>
-        </View>
+        <TimeField label="Time (optional)" value={time24} onChange={setTime24} placeholder="No time set" clearable />
         <Field label="Place (optional)" value={place} onChangeText={setPlace} placeholder="e.g. Bedroom chair" maxLength={100} />
       </Card>
 
@@ -171,7 +141,7 @@ export default function TaskEditor() {
       </Card>
 
       {error && <ErrorNote message={error} />}
-      <Button title={isNew ? 'Add task' : 'Save'} icon="checkmark" onPress={save} loading={busy} disabled={!title.trim() || !dateOk || !timeOk} />
+      <Button title={isNew ? 'Add task' : 'Save'} icon="checkmark" onPress={save} loading={busy} disabled={!title.trim() || !dateOk} />
       {!isNew && <Button title="Delete task" variant="danger" icon="trash-outline" onPress={remove} />}
     </Screen>
   );
