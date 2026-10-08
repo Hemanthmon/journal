@@ -56,8 +56,8 @@ Use `--profile production` for a Play Store bundle (.aab).
 A second person (the *viewer*) can see one user's (the *owner's*) records in a browser, but only
 after the owner grants access, and never change them.
 
-1. In `apps/api/.env` set `DASHBOARD_VIEWER_EMAIL`, `DASHBOARD_OWNER_EMAIL` (the owner's app
-   account) and a random `DASHBOARD_SESSION_SECRET` (32+ characters, different from the JWT secret).
+1. In `apps/api/.env` set `DASHBOARD_VIEWER_EMAIL`, optionally `DASHBOARD_OWNER_EMAIL` (the owner's
+   app account; when empty, the only account in the database is used) and a random `DASHBOARD_SESSION_SECRET` (32+ characters, different from the JWT secret).
    For real email delivery set `MAIL_PROVIDER=brevo`, `BREVO_API_KEY` and `MAIL_FROM_EMAIL`; in
    development `MAIL_PROVIDER=console` prints the sign-in code to the API log.
 2. Development: `npm run api:dev` and `npm run dev -w @journal/web`, then open http://localhost:5173.

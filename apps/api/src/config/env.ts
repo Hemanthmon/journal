@@ -62,7 +62,8 @@ if (env.NODE_ENV === 'production' && env.BCRYPT_ROUNDS < 12) {
   throw new Error('BCRYPT_ROUNDS must be at least 12 in production');
 }
 
-const dashboardEnabled = !!env.DASHBOARD_VIEWER_EMAIL && !!env.DASHBOARD_OWNER_EMAIL;
+// DASHBOARD_OWNER_EMAIL is optional: when empty, the only account in the database is the owner.
+const dashboardEnabled = !!env.DASHBOARD_VIEWER_EMAIL;
 if (dashboardEnabled) {
   if (env.DASHBOARD_SESSION_SECRET.length < 32) {
     throw new Error('DASHBOARD_SESSION_SECRET must be at least 32 characters when the dashboard is enabled');

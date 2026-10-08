@@ -9,7 +9,9 @@ import { logger } from '../../lib/logger';
  * Who may view whose data on the read-only dashboard. Access is a row in
  * `dashboard_access`; revoking sets `revoked_at`. For now the grant is managed from
  * DASHBOARD_VIEWER_EMAIL / DASHBOARD_OWNER_EMAIL (source 'env'); changing those variables
- * revokes the old env grant and creates the new one at the next server start.
+ * revokes the old env grant and creates the new one at the next server start. Without
+ * DASHBOARD_OWNER_EMAIL the owner is the only account; once there are several, access is
+ * revoked until the variable names one, so the viewer never sees the wrong person's data.
  */
 
 export interface AccessGrant {
@@ -49,10 +51,12 @@ export async function syncEnvAccess(): Promise<void> {
       await conn.execute("UPDATE dashboard_access SET revoked_at = ? WHERE source = 'env' AND revoked_at IS NULL", [now]);
       return;
     }
-    const [owners] = await conn.execute<Row[]>('SELECT id FROM users WHERE email = ?', [ownerEmail]);
-    const ownerId = owners[0]?.id as string | undefined;
+    const [owners] = ownerEmail
+      ? await conn.execute<Row[]>('SELECT id FROM users WHERE email = ?', [ownerEmail])
+      : await conn.execute<Row[]>('SELECT id FROM users LIMIT 2');
+    const ownerId = owners.length === 1 ? (owners[0]?.id as string) : undefined;
     if (!ownerId) {
-      logger.warn('dashboard_owner_not_found');
+      logger.warn(ownerEmail || owners.length === 0 ? 'dashboard_owner_not_found' : 'dashboard_owner_ambiguous');
       await conn.execute("UPDATE dashboard_access SET revoked_at = ? WHERE source = 'env' AND revoked_at IS NULL", [now]);
       return;
     }
