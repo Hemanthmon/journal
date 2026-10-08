@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { formatTime12 } from '@journal/shared';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
+import { GoogleCalendarCard } from '../../../components/GoogleCalendarCard';
 import { SessionBanner } from '../../../components/SessionBanner';
 import { Body, Button, Card, Chip, Divider, ErrorNote, LinkRow, Muted, Screen, SectionTitle, Segmented, ToggleRow } from '../../../components/ui';
 import { exportHabitsCsv, exportHabitDefinitionsCsv, exportJournalCsv, exportUrgesCsv } from '../../../data/exporter';
@@ -117,6 +118,8 @@ export default function Profile() {
         )}
         <Button title="Sync now" variant="secondary" icon="sync-outline" onPress={() => void syncService.syncNow()} />
       </Card>
+
+      <GoogleCalendarCard />
 
       <Card>
         <SectionTitle>Daily Routine Settings</SectionTitle>

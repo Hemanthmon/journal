@@ -20,6 +20,7 @@ import { AppError, unauthenticated } from '../../lib/errors';
 import { requireUserId } from '../../middleware/authenticate';
 import { validateBody, validateQuery } from '../../middleware/validate';
 import { applyRecord, constraintErrorCode, findRecord, rowToRecord, type ApplyOutcome } from '../../records/records';
+import { syncGoogle, syncGoogleWithin } from '../google/sync';
 
 const PROCESSED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -119,6 +120,8 @@ export function syncRouter(): Router {
       throw new AppError(409, ErrorCode.EPOCH_CHANGED, 'Your data was reset on another device. Re-download required.');
     }
     res.json({ data: outcome.body });
+    // New block versions go to Google in the background.
+    if (changes.some((c) => c.entity === 'timeBlocks')) void syncGoogle(userId, { pull: false });
   });
 
   /**
@@ -128,6 +131,8 @@ export function syncRouter(): Router {
   router.get('/pull', validateQuery(pullQuerySchema), async (req, res) => {
     const userId = requireUserId(req);
     const { cursor, limit } = res.locals.query as { cursor: number; limit: number };
+    // Bring in Google Calendar changes first (throttled), so this pull includes them.
+    await syncGoogleWithin(userId, 8000);
     const conn = await getPool().getConnection();
     try {
       await conn.query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');

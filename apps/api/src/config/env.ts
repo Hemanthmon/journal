@@ -49,6 +49,16 @@ const envSchema = z.object({
   BREVO_API_KEY: z.string().default(''),
   MAIL_FROM_EMAIL: z.string().default(''),
   MAIL_FROM_NAME: z.string().default('Journal'),
+
+  // Google Calendar two-way sync (optional). Create an OAuth client (type "Web application")
+  // in Google Cloud with redirect URI <PUBLIC_URL>/api/google/callback.
+  GOOGLE_CLIENT_ID: z.string().trim().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
+  // Encrypts stored Google refresh tokens: 32+ random characters.
+  GOOGLE_TOKEN_KEY: z.string().default(''),
+  // Public https address of this server, e.g. https://journal-api-sv60.onrender.com
+  // (defaults to the address the request came in on).
+  PUBLIC_URL: z.string().trim().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -78,6 +88,11 @@ if (dashboardEnabled) {
   if (env.MAIL_PROVIDER === 'brevo' && (!env.BREVO_API_KEY || !env.MAIL_FROM_EMAIL)) {
     throw new Error('MAIL_PROVIDER=brevo needs BREVO_API_KEY and MAIL_FROM_EMAIL');
   }
+}
+
+const googleEnabled = !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET;
+if (googleEnabled && env.GOOGLE_TOKEN_KEY.length < 32) {
+  throw new Error('GOOGLE_TOKEN_KEY must be at least 32 characters when Google sync is enabled');
 }
 
 /**
@@ -126,6 +141,13 @@ export const config = {
     ownerEmail: env.DASHBOARD_OWNER_EMAIL,
     sessionSecret: env.DASHBOARD_SESSION_SECRET,
     sessionHours: env.DASHBOARD_SESSION_HOURS,
+  },
+  google: {
+    enabled: googleEnabled,
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    tokenKey: env.GOOGLE_TOKEN_KEY,
+    publicUrl: env.PUBLIC_URL.replace(/\/$/, ''),
   },
   mail: {
     provider: env.MAIL_PROVIDER,

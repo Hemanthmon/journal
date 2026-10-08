@@ -18,6 +18,7 @@ import { journalAnswersRouter } from './modules/journalAnswers/routes';
 import { journalQuestionsRouter } from './modules/journalQuestions/routes';
 import { profileRouter } from './modules/profile/routes';
 import { syncRouter } from './modules/sync/routes';
+import { googleRouter } from './modules/google/routes';
 import { urgeSupportRouter } from './modules/urgeSupport/routes';
 import { urgesRouter } from './modules/urges/routes';
 
@@ -58,6 +59,8 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/sync', authenticate, syncRouter());
   app.use('/api/dashboard-access', authenticate, dashboardSharingRouter());
   app.use('/api/urge-support', authenticate, urgeSupportRouter());
+  // Google Calendar connection (the OAuth start/callback pages are opened in a browser).
+  app.use('/api/google', googleRouter());
 
   // Read-only web dashboard API (its own email-code sessions; see modules/dashboard).
   app.use('/api/dashboard', dashboardRouter({ rateLimitMax: opts.authRateLimitMax ?? config.auth.rateLimitMax }));

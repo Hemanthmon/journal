@@ -69,3 +69,13 @@ services:
         sync: false
       - key: MAIL_FROM_EMAIL
         sync: false
+      # Google Calendar two-way sync (optional): OAuth client from Google Cloud. Leave the
+      # client id empty to keep it off. The token key is generated once by Render.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_TOKEN_KEY
+        generateValue: true
+      - key: PUBLIC_URL
+        value: https://journal-api-sv60.onrender.com
