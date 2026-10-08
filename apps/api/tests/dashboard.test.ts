@@ -28,6 +28,7 @@ setMailer({
   async sendInvite(to, mail) {
     invites.push({ to, ...mail });
   },
+  async sendUrgeNote() {},
 });
 
 let ownerAuth: Record<string, string>;

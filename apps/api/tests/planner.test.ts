@@ -18,6 +18,7 @@ setMailer({
     codes.push({ to, code: mail.code });
   },
   async sendInvite() {},
+  async sendUrgeNote() {},
 });
 
 const t0 = '2026-10-01T08:00:00.000Z';

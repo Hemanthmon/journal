@@ -34,6 +34,7 @@ async function deleteUserRecords(conn: PoolConnection, userId: string) {
     'plan_goals',
     'plan_reviews',
     'identities',
+    'urge_notes',
     'processed_changes',
   ]) {
     await conn.execute(`DELETE FROM ${table} WHERE user_id = ?`, [userId]);

@@ -11,9 +11,56 @@ import {
   totalSeconds,
   type DurationKey,
 } from '../../../lib/breathing';
+import { api, isNetworkError } from '../../../api/client';
 import { font, space, useTheme } from '../../../lib/theme';
+import { usePrefs } from '../../../state/prefs';
 
 type Mode = 'intro' | 'running' | 'paused' | 'done';
+
+type NoteState = { status: 'off' | 'sending' | 'limit' | 'offline' | 'failed' } | { status: 'sent'; title: string };
+
+/** Emails one calming note to the user's login address when the exercise is opened. */
+function useUrgeNote(): NoteState {
+  const enabled = usePrefs((s) => s.urgeNoteEmail);
+  const [state, setState] = useState<NoteState>({ status: enabled ? 'sending' : 'off' });
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    api
+      .post<{ data: { sent: boolean; title?: string } }>('/urge-support/note')
+      .then((res) => {
+        const d = res.data.data;
+        if (alive) setState(d.sent && d.title ? { status: 'sent', title: d.title } : { status: 'limit' });
+      })
+      .catch((e: unknown) => {
+        if (alive) setState({ status: isNetworkError(e) ? 'offline' : 'failed' });
+      });
+    return () => {
+      alive = false;
+    };
+    // Once per visit to this screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return state;
+}
+
+function NoteLine({ note, after }: { note: NoteState; after: boolean }) {
+  const { c } = useTheme();
+  const text =
+    note.status === 'sending'
+      ? 'Sending a note to your inbox…'
+      : note.status === 'sent'
+        ? after
+          ? `Your note "${note.title}" is in your inbox. Read it now. 💌`
+          : 'A note is on its way to your inbox. Read it after you breathe. 💌'
+        : note.status === 'offline'
+          ? "You're offline, so no note this time. The breathing still works."
+          : note.status === 'limit'
+            ? "You've had a few notes this hour. The ones in your inbox are still there for you."
+            : null;
+  if (!text) return null;
+  return <Text style={{ color: note.status === 'sent' ? c.success : c.muted, fontWeight: '600' }}>{text}</Text>;
+}
 
 const KEEP_AWAKE_TAG = 'breathing';
 const CIRCLE = 240;
@@ -29,6 +76,7 @@ export default function Breathe() {
   const accumulated = useRef(0); // ms completed before the current run segment
   const startedAt = useRef(0);
   const scale = useRef(new Animated.Value(REST_SCALE)).current;
+  const note = useUrgeNote();
 
   const cycles = DURATIONS.find((d) => d.key === durationKey)!.cycles;
   const state = breathStateAt(elapsedMs, cycles);
@@ -97,6 +145,7 @@ export default function Breathe() {
       <Screen>
         <Stack.Screen options={{ title: 'Breathe' }} />
         <Title>Let the urge pass</Title>
+        <NoteLine note={note} after={false} />
         <Body>
           Urges rise, peak and fade, usually within minutes. Slow breathing calms your body while it passes. You don't
           have to fight it; just breathe, and stop whenever you feel calmer.
@@ -128,6 +177,7 @@ export default function Breathe() {
       <Screen>
         <Stack.Screen options={{ title: 'Breathe' }} />
         <Title>{endedEarly ? "Glad it's easing" : 'Well done'}</Title>
+        <NoteLine note={note} after />
         <Body>
           Take a moment to notice how the urge feels now. If it's still there, that's okay; it will keep fading. You can
           breathe again, go for a short walk, or drink some water.

@@ -1,5 +1,6 @@
 import { config } from '../../config/env';
 import { logger } from '../../lib/logger';
+import { KIND_LABEL, type UrgeNote } from '../urgeSupport/notes';
 
 /**
  * Dashboard emails: sign-in codes and "you've been invited" notes.
@@ -24,9 +25,15 @@ export interface InviteEmail {
   dashboardUrl: string;
 }
 
+export interface UrgeNoteEmail {
+  name: string;
+  note: UrgeNote;
+}
+
 export interface Mailer {
   sendLoginCode(to: string, mail: LoginCodeEmail): Promise<void>;
   sendInvite(to: string, mail: InviteEmail): Promise<void>;
+  sendUrgeNote(to: string, mail: UrgeNoteEmail): Promise<void>;
 }
 
 interface Message {
@@ -171,6 +178,76 @@ Growth is easier with someone in your corner. Thank you for being that person.`,
   };
 }
 
+/**
+ * A calm note for riding out an urge. Softer palette than the other emails (misty
+ * teal and sage), lots of space, one idea, one small action. The subject and preview
+ * are deliberately neutral because they show on the lock screen.
+ */
+export function urgeNoteMessage(m: UrgeNoteEmail): Message {
+  const p = {
+    page: '#eef3f3',
+    card: '#fbfdfc',
+    deep: '#3f6670',
+    sage: '#7fa596',
+    mist: '#e3ecea',
+    ink: '#2d3b3d',
+    muted: '#6a7c7e',
+  };
+  const n = m.note;
+  const hi = `Hi ${firstName(m.name)},`;
+  const preheader = 'Take a slow breath. This one is for right now.';
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${escapeHtml(n.title)}</title>
+</head>
+<body style="margin:0;padding:0;background:${p.page};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${p.page};">${preheader}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${p.page}" style="background:${p.page};">
+<tr><td align="center" style="padding:36px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:500px;">
+    <tr><td bgcolor="${p.deep}" style="background:${p.deep};background-image:linear-gradient(160deg,${p.deep},${p.sage});border-radius:24px 24px 0 0;padding:34px 32px 30px;text-align:center;">
+      <div style="font-size:30px;line-height:1;">🌊</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:${p.mist};margin-top:14px;">${escapeHtml(KIND_LABEL[n.kind])}</div>
+      <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.3;color:#ffffff;margin-top:8px;">${escapeHtml(n.title)}</div>
+    </td></tr>
+    <tr><td bgcolor="${p.card}" style="background:${p.card};border-radius:0 0 24px 24px;padding:32px;font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.75;color:${p.ink};">
+      <p style="margin:0 0 18px;">${escapeHtml(hi)}</p>
+      ${n.paragraphs.map((t) => `<p style="margin:0 0 18px;">${escapeHtml(t)}</p>`).join('\n      ')}
+      <div style="background:${p.mist};border-radius:16px;padding:18px 20px;margin:26px 0 22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${p.deep};">
+        <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;margin-bottom:6px;">Right now</div>
+        ${escapeHtml(n.action)}
+      </div>
+      <p style="margin:0;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${p.muted};">Breathe in for 4 &middot; out for 6.<br>It always passes. You've got this. 💙</p>
+    </td></tr>
+    <tr><td align="center" style="padding:20px 24px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:${p.muted};">
+      Sent by your Journal app because you opened the breathing exercise.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
+  return {
+    subject: `${n.title} 🌊`,
+    preheader,
+    fromName: 'Journal',
+    text: `${hi}
+
+${n.title.toUpperCase()}
+
+${n.paragraphs.join('\n\n')}
+
+Right now: ${n.action}
+
+Breathe in for 4, out for 6. It always passes. You've got this.`,
+    html,
+  };
+}
+
 // ------------------------------------------------------------------ transports
 
 async function sendViaBrevo(to: string, msg: Message): Promise<void> {
@@ -203,6 +280,7 @@ class MailProviderError extends Error {
 const brevoMailer: Mailer = {
   sendLoginCode: (to, mail) => sendViaBrevo(to, loginCodeMessage(mail)),
   sendInvite: (to, mail) => sendViaBrevo(to, inviteMessage(mail, to)),
+  sendUrgeNote: (to, mail) => sendViaBrevo(to, urgeNoteMessage(mail)),
 };
 
 const consoleMailer: Mailer = {
@@ -214,6 +292,10 @@ const consoleMailer: Mailer = {
   async sendInvite(to, mail) {
     if (config.isTest) return;
     console.log(`[dashboard] invite for ${to} from ${mail.ownerName}: ${mail.dashboardUrl}`);
+  },
+  async sendUrgeNote(to, mail) {
+    if (config.isTest) return;
+    console.log(`[urge-note] for ${to}: ${mail.note.title}`);
   },
 };
 

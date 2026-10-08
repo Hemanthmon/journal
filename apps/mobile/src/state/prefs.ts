@@ -13,6 +13,8 @@ export interface Prefs {
   planMorningTime: string; // HH:MM
   planEveningEnabled: boolean;
   planEveningTime: string; // HH:MM
+  /** Email a calming note to the login address when the breathing exercise is opened. */
+  urgeNoteEmail: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -25,6 +27,7 @@ const DEFAULTS: Prefs = {
   planMorningTime: '07:30',
   planEveningEnabled: false,
   planEveningTime: '21:30',
+  urgeNoteEmail: true,
 };
 
 let prefsDb: Db | null = null;

@@ -33,7 +33,7 @@ describe('migrations', () => {
   it('records applied migrations and is a no-op when re-run', async () => {
     const result = await migrate();
     expect(result.applied).toEqual([]);
-    expect(result.skipped).toEqual(['001_init.sql', '002_default_questions.sql', '003_data_epoch.sql', '004_reminders.sql', '005_emotion_options.sql', '006_urge_duration.sql', '007_dashboard_access.sql', '008_dashboard_viewer_name.sql', '009_planner.sql']);
+    expect(result.skipped).toEqual(['001_init.sql', '002_default_questions.sql', '003_data_epoch.sql', '004_reminders.sql', '005_emotion_options.sql', '006_urge_duration.sql', '007_dashboard_access.sql', '008_dashboard_viewer_name.sql', '009_planner.sql', '010_urge_notes.sql']);
   });
 
   it('seeds the four default questions in order', async () => {

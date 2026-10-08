@@ -228,6 +228,12 @@ export default function Profile() {
             )}
           </>
         )}
+        <ToggleRow
+          label="Email me a note during an urge"
+          hint="When you open the breathing exercise, a short calming note is sent to your login email. Each one is different."
+          value={prefs.urgeNoteEmail}
+          onChange={(v) => void prefs.set({ urgeNoteEmail: v })}
+        />
         <Divider />
         <Body style={{ fontWeight: '600' }}>Privacy</Body>
         <ToggleRow
