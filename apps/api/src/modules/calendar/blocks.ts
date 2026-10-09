@@ -90,7 +90,7 @@ export async function deleteBlockFor(userId: string, id: string) {
   return writeBlock(userId, { ...current, deletedAt: new Date().toISOString() });
 }
 
-async function load<E extends 'timeBlocks' | 'planTasks' | 'identities'>(entity: E, userId: string, where = '', params: unknown[] = []) {
+async function load<E extends 'timeBlocks' | 'planTasks' | 'identities' | 'repeatSeries'>(entity: E, userId: string, where = '', params: unknown[] = []) {
   const def = ENTITIES[entity];
   const [rows] = await getPool().query<Row[]>(
     `SELECT server_seq, ${def.fields.map((f) => f.col).join(', ')} FROM ${def.table}
@@ -104,11 +104,12 @@ export async function calendarView(
   userId: string,
   range: { from: string; to: string; today: string; canEdit: boolean },
 ): Promise<DashboardCalendar> {
-  const [blocks, tasks, identities, google] = await Promise.all([
+  const [blocks, tasks, identities, google, series] = await Promise.all([
     load('timeBlocks', userId, ' AND local_date BETWEEN ? AND ?', [range.from, range.to]),
     load('planTasks', userId, ' AND local_time IS NOT NULL AND local_date BETWEEN ? AND ?', [range.from, range.to]),
     load('identities', userId),
     getPool().query<Row[]>('SELECT last_sync_at FROM google_accounts WHERE user_id = ?', [userId]),
+    load('repeatSeries', userId),
   ]);
   const name = new Map(identities.map((i) => [i.id, i.statement]));
   const hhmm = (t: string) => t.slice(0, 5);
@@ -123,6 +124,7 @@ export async function calendarView(
       identityId: b.identityId,
       identity: b.identityId ? (name.get(b.identityId) ?? null) : null,
       notes: b.notes,
+      seriesId: b.seriesId ?? null,
     }))
     .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
   const g = google[0][0];
@@ -140,9 +142,13 @@ export async function calendarView(
         time: hhmm(t.localTime!),
         done: !!t.completedAt,
         identity: t.identityId ? (name.get(t.identityId) ?? null) : null,
+        identityId: t.identityId,
+        twoMinute: t.twoMinute,
+        seriesId: t.seriesId ?? null,
       }))
       .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)),
     identities: identities.filter((i) => i.isActive).map((i) => ({ id: i.id, statement: i.statement })),
+    series: series.map((s) => ({ id: s.id, frequency: s.frequency, days: s.days, endDate: s.endDate })),
     google: { connected: !!g, lastSyncAt: g?.last_sync_at ? (g.last_sync_at as Date).toISOString() : null },
   };
 }

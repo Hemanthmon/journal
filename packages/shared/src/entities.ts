@@ -22,6 +22,7 @@ import {
   type TimeBlockRecord,
 } from './schemas/planner';
 import { reminderRecordSchema, type ReminderRecord } from './schemas/reminders';
+import { repeatSeriesRecordSchema, type RepeatSeriesRecord } from './schemas/repeat';
 import { urgeRecordSchema, type UrgeRecord } from './schemas/urges';
 
 /**
@@ -211,6 +212,7 @@ export const ENTITIES = {
       f('twoMinute', 'two_minute', 'string'),
       f('completedAt', 'completed_at', 'datetime'),
       f('displayOrder', 'display_order', 'number'),
+      f('seriesId', 'series_id', 'string'),
     ],
     schema: planTaskRecordSchema,
     stickyDelete: true,
@@ -240,8 +242,32 @@ export const ENTITIES = {
       f('color', 'color', 'string'),
       f('identityId', 'identity_id', 'string'),
       f('notes', 'notes', 'string'),
+      f('seriesId', 'series_id', 'string'),
     ],
     schema: timeBlockRecordSchema,
+    // Occurrences of a series have deterministic ids, but a deleted occurrence must stay
+    // deleted (or the series would bring it back).
+    stickyDelete: true,
+  },
+  repeatSeries: {
+    table: 'repeat_series',
+    fields: [
+      ...BASE_FIELDS,
+      f('kind', 'kind', 'string'),
+      f('title', 'title', 'string'),
+      f('startDate', 'start_date', 'date'),
+      f('endDate', 'end_date', 'date'),
+      f('frequency', 'frequency', 'string'),
+      f('days', 'days', 'mask'),
+      f('startTime', 'start_time', 'time'),
+      f('endTime', 'end_time', 'time'),
+      f('color', 'color', 'string'),
+      f('identityId', 'identity_id', 'string'),
+      f('notes', 'notes', 'string'),
+      f('place', 'place', 'string'),
+      f('twoMinute', 'two_minute', 'string'),
+    ],
+    schema: repeatSeriesRecordSchema,
     stickyDelete: true,
   },
 } satisfies Record<string, EntityDef>;
@@ -260,6 +286,7 @@ export const ENTITY_ORDER: EntityName[] = [
   'emotionOptions',
   'identities',
   'planGoals',
+  'repeatSeries',
   'planTasks',
   'planReviews',
   'timeBlocks',
@@ -279,6 +306,7 @@ export interface EntityRecordMap {
   planTasks: PlanTaskRecord;
   planReviews: PlanReviewRecord;
   timeBlocks: TimeBlockRecord;
+  repeatSeries: RepeatSeriesRecord;
 }
 
 export type AnyRecord = EntityRecordMap[EntityName];

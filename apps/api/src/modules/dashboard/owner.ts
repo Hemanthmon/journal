@@ -17,6 +17,7 @@ import { localDateIn } from '../../lib/tz';
 import { validateBody, validateQuery } from '../../middleware/validate';
 import { applyRecord, constraintErrorCode, findRecord, rowToRecord } from '../../records/records';
 import { notifyBlocksChanged } from '../calendar/blocks';
+import { createSeriesFor, deleteOccurrenceFor, editOccurrenceFor, ensureOccurrencesFor } from '../calendar/series';
 import type { DashboardContext } from './auth';
 
 /**
@@ -40,6 +41,28 @@ const EDITABLE: EntityName[] = [
   'planReviews',
   'timeBlocks',
 ];
+
+const repeatSchema = z
+  .object({
+    frequency: z.enum(['daily', 'weekly', 'custom']),
+    days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
+    endDate: localDateSchema.nullable(),
+  })
+  .strict();
+const fieldsSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Give it a name').max(200),
+    startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable(),
+    endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable(),
+    color: z.enum(['sage', 'sky', 'lavender', 'peach', 'rose', 'sand']).nullable(),
+    identityId: z.string().uuid().nullable(),
+    notes: z.string().max(2000).nullable().optional(),
+    place: z.string().max(100).nullable().optional(),
+    twoMinute: z.string().max(200).nullable().optional(),
+  })
+  .strict();
+const kindSchema = z.enum(['block', 'task']);
+const scopeSchema = z.enum(['one', 'following']);
 
 function ownerCtx(req: Request): DashboardContext {
   const c = req.dashboard;
@@ -82,6 +105,8 @@ export function ownerRouter(): Router {
     const c = ownerCtx(req);
     const { from, to } = res.locals.query as { from: string; to: string };
     const uid = c.ownerUserId;
+    const today = localDateIn(new Date(), c.timezone);
+    await ensureOccurrencesFor(uid, addDays(from, -1), to, today);
     const inRange = ' AND local_date BETWEEN ? AND ?';
     const [habits, journalQuestions, identities, emotionOptions, dailyRoutines, habitLogs, urges, planTasks, timeBlocks, planGoals, planReviews] =
       await Promise.all([
@@ -104,7 +129,7 @@ export function ownerRouter(): Router {
     res.json({
       data: {
         userId: uid,
-        today: localDateIn(new Date(), c.timezone),
+        today,
         records: {
           habits,
           journalQuestions,
@@ -121,6 +146,42 @@ export function ownerRouter(): Router {
         },
       },
     });
+  });
+
+  // ---------------------------------------------------------------- repeats
+
+  /** Starts a repeating block or task. */
+  router.post(
+    '/series',
+    validateBody(z.object({ kind: kindSchema, startDate: localDateSchema, fields: fieldsSchema, repeat: repeatSchema }).strict()),
+    async (req, res) => {
+      const c = ownerCtx(req);
+      const b = req.body as { kind: 'block' | 'task'; startDate: string; fields: z.infer<typeof fieldsSchema>; repeat: z.infer<typeof repeatSchema> };
+      const id = await createSeriesFor(c.ownerUserId, b.kind, b.startDate, b.fields, b.repeat, localDateIn(new Date(), c.timezone));
+      res.status(201).json({ data: { id } });
+    },
+  );
+
+  /** Edits an occurrence: this one only, or this and the following ones. */
+  router.post(
+    '/occurrence/edit',
+    validateBody(
+      z.object({ kind: kindSchema, id: z.string().uuid(), scope: scopeSchema, date: localDateSchema, fields: fieldsSchema, repeat: repeatSchema.nullable() }).strict(),
+    ),
+    async (req, res) => {
+      const c = ownerCtx(req);
+      const b = req.body as { kind: 'block' | 'task'; id: string; scope: 'one' | 'following'; date: string; fields: z.infer<typeof fieldsSchema>; repeat: z.infer<typeof repeatSchema> | null };
+      await editOccurrenceFor(c.ownerUserId, b.kind, b.id, { date: b.date, fields: b.fields, repeat: b.repeat }, b.scope, localDateIn(new Date(), c.timezone));
+      res.json({ data: { ok: true } });
+    },
+  );
+
+  /** Deletes an occurrence: this one only, or this and the following ones. */
+  router.post('/occurrence/delete', validateBody(z.object({ kind: kindSchema, id: z.string().uuid(), scope: scopeSchema }).strict()), async (req, res) => {
+    const c = ownerCtx(req);
+    const b = req.body as { kind: 'block' | 'task'; id: string; scope: 'one' | 'following' };
+    await deleteOccurrenceFor(c.ownerUserId, b.kind, b.id, b.scope);
+    res.json({ data: { ok: true } });
   });
 
   /** Creates, updates or (with deletedAt) deletes one record. */

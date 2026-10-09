@@ -15,6 +15,7 @@ import {
 } from '@journal/shared';
 import { api, errorMessage, useApi } from '../api';
 import { newId, save } from '../owner/store';
+import { RepeatField, ScopeAsk, choiceOf, type RepeatChoice } from '../owner/RepeatField';
 import { ErrorBox, Loading } from '../components/ui';
 
 const HOUR = 48; // px per hour
@@ -54,10 +55,25 @@ function layout(items: Item[]) {
 
 interface Draft extends BlockInput {
   id?: string;
+  seriesId?: string | null;
 }
 
-function BlockDialog({ draft, identities, onClose, onSaved }: { draft: Draft; identities: DashboardCalendar['identities']; onClose: () => void; onSaved: () => void }) {
+function BlockDialog({
+  draft,
+  identities,
+  series,
+  onClose,
+  onSaved,
+}: {
+  draft: Draft;
+  identities: DashboardCalendar['identities'];
+  series: DashboardCalendar['series'];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [d, setD] = useState<Draft>(draft);
+  const [repeat, setRepeat] = useState<RepeatChoice | null>(() => choiceOf(series.find((s) => s.id === draft.seriesId)));
+  const [ask, setAsk] = useState<'save' | 'delete' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<Draft>) => setD((cur) => ({ ...cur, ...patch }));
@@ -69,30 +85,34 @@ function BlockDialog({ draft, identities, onClose, onSaved }: { draft: Draft; id
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const save = async () => {
+  const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    const { id, ...body } = d;
+    setAsk(null);
     try {
-      if (id) await api.put(`/blocks/${id}`, body);
-      else await api.post('/blocks', body);
+      await fn();
       onSaved();
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);
     }
   };
+  const fields = () => ({ title: d.title, startTime: d.startTime, endTime: d.endTime, color: d.color, identityId: d.identityId ?? null, notes: d.notes ?? null });
 
-  const remove = async () => {
-    if (!d.id || !window.confirm(`Delete "${d.title}"?`)) return;
-    setBusy(true);
-    try {
-      await api.delete(`/blocks/${d.id}`);
-      onSaved();
-    } catch (e) {
-      setError(errorMessage(e));
-      setBusy(false);
-    }
+  const save = (scope?: 'one' | 'following') => {
+    const { id, seriesId: _s, ...body } = d;
+    if (!id) return void run(() => (repeat ? api.post('/owner/series', { kind: 'block', startDate: d.localDate, fields: fields(), repeat }) : api.post('/blocks', body)));
+    if (d.seriesId && !scope) return setAsk('save');
+    if (d.seriesId || repeat)
+      return void run(() => api.post('/owner/occurrence/edit', { kind: 'block', id, scope: scope ?? 'one', date: d.localDate, fields: fields(), repeat }));
+    void run(() => api.put(`/blocks/${id}`, body));
+  };
+
+  const remove = (scope?: 'one' | 'following') => {
+    if (!d.id) return;
+    if (d.seriesId && !scope) return setAsk('delete');
+    if (!d.seriesId && !window.confirm(`Delete "${d.title}"?`)) return;
+    void run(() => (d.seriesId ? api.post('/owner/occurrence/delete', { kind: 'block', id: d.id, scope }) : api.delete(`/blocks/${d.id}`)));
   };
 
   return (
@@ -104,7 +124,7 @@ function BlockDialog({ draft, identities, onClose, onSaved }: { draft: Draft; id
           style={{ gap: 12 }}
           onSubmit={(e) => {
             e.preventDefault();
-            if (d.title.trim() && endOk) void save();
+            if (d.title.trim() && endOk) save();
           }}
         >
           <label className="field">
@@ -158,15 +178,17 @@ function BlockDialog({ draft, identities, onClose, onSaved }: { draft: Draft; id
               </select>
             </label>
           )}
+          <RepeatField date={d.localDate} value={repeat} onChange={setRepeat} />
           <label className="field">
             Notes
             <textarea rows={3} maxLength={2000} value={d.notes ?? ''} onChange={(e) => set({ notes: e.target.value || null })} />
           </label>
           {error && <div className="error" role="alert">{error}</div>}
+          {ask && <ScopeAsk what="block" verb={ask === 'save' ? 'Change' : 'Delete'} onCancel={() => setAsk(null)} onPick={(sc) => (ask === 'save' ? save(sc) : remove(sc))} />}
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <div>
               {d.id && (
-                <button type="button" className="btn danger" disabled={busy} onClick={() => void remove()}>
+                <button type="button" className="btn danger" disabled={busy} onClick={() => remove()}>
                   Delete
                 </button>
               )}
@@ -320,7 +342,7 @@ export function Calendar() {
     } else if (d.kind === 'move') {
       if (!d.moved) {
         const b = d.block;
-        setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes });
+        setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes, seriesId: b.seriesId });
         return;
       }
       const len = mins(d.block.end) - mins(d.block.start);
@@ -441,6 +463,7 @@ export function Calendar() {
     <BlockDialog
       draft={draft}
       identities={data.identities}
+      series={data.series}
       onClose={() => setDraft(null)}
       onSaved={() => {
         setDraft(null);
@@ -480,7 +503,7 @@ export function Calendar() {
                     title={`${formatTime12(it.start)} ${it.label}`}
                     onClick={() =>
                       it.block && canEdit
-                        ? setDraft({ id: it.block.id, title: it.block.title, localDate: it.block.date, startTime: it.block.start, endTime: it.block.end, color: it.block.color, identityId: it.block.identityId, notes: it.block.notes })
+                        ? setDraft({ id: it.block.id, title: it.block.title, localDate: it.block.date, startTime: it.block.start, endTime: it.block.end, color: it.block.color, identityId: it.block.identityId, notes: it.block.notes, seriesId: it.block.seriesId })
                         : (setFocus(d), setView('day'))
                     }
                   >
@@ -593,7 +616,7 @@ export function Calendar() {
                         onKeyDown={(e) => {
                           if (canEdit && (e.key === 'Enter' || e.key === ' ')) {
                             e.preventDefault();
-                            setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes });
+                            setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes, seriesId: b.seriesId });
                           }
                         }}
                         onPointerDown={(e) => {
@@ -670,6 +693,7 @@ function TaskDialog({
   const [localTime, setLocalTime] = useState(time);
   const [identityId, setIdentityId] = useState('');
   const [twoMinute, setTwoMinute] = useState('');
+  const [repeat, setRepeat] = useState<RepeatChoice | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -683,6 +707,15 @@ function TaskDialog({
     setBusy(true);
     setError(null);
     try {
+      if (repeat) {
+        await api.post('/owner/series', {
+          kind: 'task',
+          startDate: localDate,
+          fields: { title: title.trim(), startTime: localTime || null, endTime: null, color: null, identityId: identityId || null, twoMinute: twoMinute.trim() || null },
+          repeat,
+        });
+        return onSaved();
+      }
       await save('planTasks', {
         id: newId(),
         title: title.trim(),
@@ -745,6 +778,7 @@ function TaskDialog({
             2-minute version (optional)
             <input type="text" value={twoMinute} maxLength={200} placeholder="e.g. Open the book" onChange={(e) => setTwoMinute(e.target.value)} />
           </label>
+          <RepeatField date={localDate} value={repeat} onChange={setRepeat} />
           {error && (
             <div className="error" role="alert">
               {error}

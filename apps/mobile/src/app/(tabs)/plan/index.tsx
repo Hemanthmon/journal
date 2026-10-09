@@ -7,6 +7,7 @@ import { describeError } from '../../../api/client';
 import { PeriodNav, Tally, TaskRow, VotesList, identityLabel, monthLabel, weekLabel } from '../../../components/planner';
 import { Timeline } from '../../../components/Timeline';
 import { timeOf, timelineFor, updateBlock } from '../../../data/blocks';
+import { ensureOccurrences } from '../../../data/series';
 import { Body, Button, Card, Chip, EmptyState, ErrorNote, Field, Loading, Muted, ProgressBar, Screen, SectionTitle, Segmented } from '../../../components/ui';
 import {
   carryOver,
@@ -108,6 +109,7 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
   const { data, isLoading } = useQuery({
     queryKey: ['plan-day', date, today],
     queryFn: async () => {
+      await ensureOccurrences(ctx, date, date, today);
       const [tasks, identities, missed, votes, timeline] = await Promise.all([
         tasksForDate(ctx, date),
         listIdentities(ctx, { includeArchived: true }),
@@ -395,6 +397,7 @@ function WeekView({ weekStart, today, setDate, openDay }: { weekStart: string; t
   const { data, isLoading } = useQuery({
     queryKey: ['plan-week', weekStart],
     queryFn: async () => {
+      await ensureOccurrences(ctx, weekStart, addDays(weekStart, 6), today);
       const [plan, identities, monthGoals] = await Promise.all([
         loadPeriod(ctx, 'week', weekStart),
         listIdentities(ctx, { includeArchived: true }),
@@ -467,6 +470,7 @@ function MonthView({ monthStart, today, setDate, openDay }: { monthStart: string
   const { data, isLoading } = useQuery({
     queryKey: ['plan-month', monthStart],
     queryFn: async () => {
+      await ensureOccurrences(ctx, monthStart, addDays(monthStart, 41), today);
       const [plan, identities] = await Promise.all([loadPeriod(ctx, 'month', monthStart), listIdentities(ctx, { includeArchived: true })]);
       return { plan, identities };
     },

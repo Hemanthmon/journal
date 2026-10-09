@@ -9,6 +9,9 @@ import { blockColors } from '../../../components/Timeline';
 import { identityLabel } from '../../../components/planner';
 import { Button, Card, Chip, ErrorNote, Field, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { createBlock, deleteBlock, getBlock, minutesOf, timeOf, updateBlock } from '../../../data/blocks';
+import { createSeries, deleteOccurrence, editOccurrence, repeatOf, type RepeatChoice, type Scope } from '../../../data/series';
+import { RepeatPicker } from '../../../components/RepeatPicker';
+import type { TimeBlockRecord } from '@journal/shared';
 import { listIdentities } from '../../../data/planner';
 import { font, radius, space, useTheme } from '../../../lib/theme';
 import { useCtx } from '../../../state/session';
@@ -37,6 +40,8 @@ export default function BlockEditor() {
   const [color, setColor] = useState<BlockColor>('sage');
   const [identityId, setIdentityId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [repeat, setRepeat] = useState<RepeatChoice | null>(null);
+  const [original, setOriginal] = useState<TimeBlockRecord | null>(null);
   const [loaded, setLoaded] = useState(isNew);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +49,10 @@ export default function BlockEditor() {
 
   useEffect(() => {
     if (!params.id) return;
-    void getBlock(ctx, params.id).then((b) => {
+    void getBlock(ctx, params.id).then(async (b) => {
       if (!b) return router.back();
+      setOriginal(b);
+      setRepeat((await repeatOf(ctx, b))?.choice ?? null);
       setTitle(b.title);
       setDate(b.localDate);
       setStart(b.startTime.slice(0, 5));
@@ -69,13 +76,11 @@ export default function BlockEditor() {
     setEnd(timeOf(Math.min(minutesOf(v) + len, 23 * 60 + 59)));
   };
 
-  const save = async () => {
+  const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    const draft = { title, localDate: date, startTime: start, endTime: end, color, identityId, notes: notes.trim() || null };
     try {
-      if (isNew) await createBlock(ctx, draft);
-      else await updateBlock(ctx, params.id!, draft);
+      await fn();
       router.back();
     } catch (e) {
       setError(describeError(e));
@@ -84,18 +89,41 @@ export default function BlockEditor() {
     }
   };
 
-  const remove = () =>
+  const save = () => {
+    const draft = { title, localDate: date, startTime: start, endTime: end, color, identityId, notes: notes.trim() || null };
+    const fields = { title, startTime: start, endTime: end, color, identityId, notes: notes.trim() || null };
+    if (isNew) return void run(() => (repeat ? createSeries(ctx, 'block', date, fields, repeat) : createBlock(ctx, draft)));
+    if (original?.seriesId) {
+      const apply = (scope: Scope) => void run(() => editOccurrence(ctx, 'block', original, { date, fields, repeat }, scope));
+      return Alert.alert('This block repeats', 'Change only this day, or this and the following ones?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'This block', onPress: () => apply('one') },
+        { text: 'This and following', onPress: () => apply('following') },
+      ]);
+    }
+    // A one-off block that now repeats: the series takes its place from this day on.
+    if (repeat)
+      return void run(async () => {
+        await deleteBlock(ctx, params.id!);
+        await createSeries(ctx, 'block', date, fields, repeat);
+      });
+    void run(() => updateBlock(ctx, params.id!, draft));
+  };
+
+  const remove = () => {
+    if (original?.seriesId) {
+      const del = (scope: Scope) => void run(() => deleteOccurrence(ctx, original, 'block', scope));
+      return Alert.alert('Delete a repeating block', title, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'This block', style: 'destructive', onPress: () => del('one') },
+        { text: 'This and following', style: 'destructive', onPress: () => del('following') },
+      ]);
+    }
     Alert.alert('Delete this block?', title, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteBlock(ctx, params.id!);
-          router.back();
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: () => void run(() => deleteBlock(ctx, params.id!)) },
     ]);
+  };
 
   return (
     <Screen>
@@ -121,6 +149,10 @@ export default function BlockEditor() {
             />
           ))}
         </View>
+      </Card>
+
+      <Card>
+        <RepeatPicker date={date} value={repeat} onChange={setRepeat} />
       </Card>
 
       <Card>

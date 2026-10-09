@@ -402,6 +402,8 @@ export interface CalendarBlock {
   identityId: string | null;
   identity: string | null;
   notes: string | null;
+  /** Set when the block is one day of a repeating series (see `series`). */
+  seriesId: string | null;
 }
 
 export interface CalendarTask {
@@ -412,6 +414,17 @@ export interface CalendarTask {
   time: string;
   done: boolean;
   identity: string | null;
+  identityId: string | null;
+  twoMinute: string | null;
+  seriesId: string | null;
+}
+
+/** A repeat rule, for showing and editing occurrences. */
+export interface CalendarSeries {
+  id: string;
+  frequency: 'daily' | 'weekly' | 'custom';
+  days: number[];
+  endDate: string | null;
 }
 
 export interface DashboardCalendar {
@@ -423,5 +436,6 @@ export interface DashboardCalendar {
   /** Planner tasks with a time, shown as task blocks. */
   tasks: CalendarTask[];
   identities: { id: string; statement: string }[];
+  series: CalendarSeries[];
   google: { connected: boolean; lastSyncAt: string | null };
 }

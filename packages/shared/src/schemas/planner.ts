@@ -109,6 +109,8 @@ export const planTaskRecordSchema = z.object({
   twoMinute: optionalText(200),
   completedAt: isoDateTimeSchema.nullable(),
   displayOrder: displayOrderSchema,
+  /** Set when this task is one day of a repeating series. */
+  seriesId: idSchema.nullable().optional(),
 });
 export type PlanTaskRecord = z.output<typeof planTaskRecordSchema>;
 
@@ -142,6 +144,8 @@ export const timeBlockRecordSchema = z
     color: z.enum(BLOCK_COLORS),
     identityId: idSchema.nullable(),
     notes: optionalText(2000),
+    /** Set when this block is one day of a repeating series. */
+    seriesId: idSchema.nullable().optional(),
   })
   .refine((b) => b.endTime > b.startTime, { message: 'The block must end after it starts', path: ['endTime'] });
 export type TimeBlockRecord = z.output<typeof timeBlockRecordSchema>;

@@ -252,6 +252,28 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS ix_time_blocks_date ON time_blocks (local_date);
   `,
+  `
+  -- Repeating blocks and tasks; occurrences point back to their series.
+  CREATE TABLE IF NOT EXISTS repeat_series (
+    id TEXT PRIMARY KEY NOT NULL,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT,
+    frequency TEXT NOT NULL,
+    days INTEGER NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    color TEXT,
+    identity_id TEXT,
+    notes TEXT,
+    place TEXT,
+    two_minute TEXT,
+    ${SYNC_COLUMNS}
+  );
+  ALTER TABLE plan_tasks ADD COLUMN series_id TEXT;
+  ALTER TABLE time_blocks ADD COLUMN series_id TEXT;
+  `,
 ];
 
 export async function migrate(db: Db): Promise<void> {
@@ -280,6 +302,7 @@ export const DATA_TABLES = [
   'plan_tasks',
   'plan_reviews',
   'time_blocks',
+  'repeat_series',
   'outbox',
   'conflicts',
   'sync_state',

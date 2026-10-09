@@ -10,6 +10,7 @@ export * from './schemas/emotions';
 export * from './schemas/sync';
 export * from './schemas/dashboard';
 export * from './schemas/planner';
+export * from './schemas/repeat';
 export * from './entities';
 export * from './schedule';
 export * from './progress';

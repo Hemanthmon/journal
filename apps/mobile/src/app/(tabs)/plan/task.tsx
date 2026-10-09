@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { localDateSchema, toLocalDate } from '@journal/shared';
+import { localDateSchema, toLocalDate, type PlanTaskRecord } from '@journal/shared';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { describeError } from '../../../api/client';
 import { DateField, TimeField } from '../../../components/DateTimeFields';
 import { identityLabel } from '../../../components/planner';
+import { RepeatPicker } from '../../../components/RepeatPicker';
+import { createSeries, deleteOccurrence, editOccurrence, repeatOf, type RepeatChoice, type Scope } from '../../../data/series';
 import { Button, Card, Chip, ErrorNote, Field, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { createTask, deleteTask, getTask, listIdentities, updateTask, weekGoalsFor } from '../../../data/planner';
 import { space } from '../../../lib/theme';
@@ -23,14 +25,18 @@ export default function TaskEditor() {
   const [time24, setTime24] = useState<string | null>(params.time && /^\d{2}:\d{2}$/.test(params.time) ? params.time : null);
   const [place, setPlace] = useState('');
   const [twoMinute, setTwoMinute] = useState('');
+  const [repeat, setRepeat] = useState<RepeatChoice | null>(null);
+  const [original, setOriginal] = useState<PlanTaskRecord | null>(null);
   const [loaded, setLoaded] = useState(isNew);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!params.id) return;
-    void getTask(ctx, params.id).then((t) => {
+    void getTask(ctx, params.id).then(async (t) => {
       if (!t) return router.back();
+      setOriginal(t);
+      setRepeat((await repeatOf(ctx, t))?.choice ?? null);
       setTitle(t.title);
       setDate(t.localDate);
       setIdentityId(t.identityId);
@@ -53,9 +59,20 @@ export default function TaskEditor() {
 
   if (!loaded || !options) return <Loading />;
 
-  const save = async () => {
+  const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
+    try {
+      await fn();
+      router.back();
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = () => {
     const draft = {
       title,
       localDate: date,
@@ -65,29 +82,39 @@ export default function TaskEditor() {
       place: place.trim() || null,
       twoMinute: twoMinute.trim() || null,
     };
-    try {
-      if (isNew) await createTask(ctx, draft);
-      else await updateTask(ctx, params.id!, draft);
-      router.back();
-    } catch (e) {
-      setError(describeError(e));
-    } finally {
-      setBusy(false);
+    const fields = { title, startTime: time24, endTime: null, color: null, identityId, place: draft.place, twoMinute: draft.twoMinute };
+    if (isNew) return void run(() => (repeat ? createSeries(ctx, 'task', date, fields, repeat) : createTask(ctx, draft)));
+    if (original?.seriesId) {
+      const apply = (scope: Scope) => void run(() => editOccurrence(ctx, 'task', original, { date, fields, repeat }, scope));
+      return Alert.alert('This task repeats', 'Change only this day, or this and the following ones?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'This task', onPress: () => apply('one') },
+        { text: 'This and following', onPress: () => apply('following') },
+      ]);
     }
+    // A one-off task that now repeats: the series takes its place from this day on.
+    if (repeat)
+      return void run(async () => {
+        await deleteTask(ctx, params.id!);
+        await createSeries(ctx, 'task', date, fields, repeat);
+      });
+    void run(() => updateTask(ctx, params.id!, draft));
   };
 
-  const remove = () =>
+  const remove = () => {
+    if (original?.seriesId) {
+      const del = (scope: Scope) => void run(() => deleteOccurrence(ctx, original, 'task', scope));
+      return Alert.alert('Delete a repeating task', title, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'This task', style: 'destructive', onPress: () => del('one') },
+        { text: 'This and following', style: 'destructive', onPress: () => del('following') },
+      ]);
+    }
     Alert.alert('Delete this task?', title, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTask(ctx, params.id!);
-          router.back();
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: () => void run(() => deleteTask(ctx, params.id!)) },
     ]);
+  };
 
   return (
     <Screen>
@@ -126,6 +153,10 @@ export default function TaskEditor() {
         <Muted>"I will [task] at [time] in [place]." You'll get a reminder at that time.</Muted>
         <TimeField label="Time (optional)" value={time24} onChange={setTime24} placeholder="No time set" clearable />
         <Field label="Place (optional)" value={place} onChangeText={setPlace} placeholder="e.g. Bedroom chair" maxLength={100} />
+      </Card>
+
+      <Card>
+        <RepeatPicker date={date} value={repeat} onChange={setRepeat} />
       </Card>
 
       <Card>

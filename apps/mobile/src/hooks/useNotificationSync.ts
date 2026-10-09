@@ -3,6 +3,7 @@ import { addDays, toLocalDate } from '@journal/shared';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { listLocal } from '../data/records';
+import { ensureOccurrences } from '../data/series';
 import { applyNotifications, ensurePermission, hasPermission, remindersSupported } from '../lib/notifications';
 import { usePrefs } from '../state/prefs';
 import { useCtx } from '../state/session';
@@ -19,6 +20,8 @@ export function useNotificationSync() {
     queryKey: ['notify-tasks', today],
     enabled: remindersSupported,
     queryFn: async () => {
+      // Repeating tasks need their coming days in place to get reminders.
+      await ensureOccurrences(ctx, today, addDays(today, 7), today);
       const rows = await listLocal(ctx.db, 'planTasks', {
         where: 'local_time IS NOT NULL AND completed_at IS NULL AND local_date BETWEEN ? AND ?',
         params: [today, addDays(today, 7)],

@@ -28,6 +28,10 @@ export const defaultEmotionId = (userId: string, name: string) =>
 export const planReviewId = (userId: string, level: 'week' | 'month', periodStart: string) =>
   uuidv5(`${userId}:plan-review:${level}:${periodStart}`, APP_NAMESPACE);
 
+/** The occurrence of a repeating block or task on one day: the same id on every device. */
+export const seriesInstanceId = (userId: string, seriesId: string, localDate: string) =>
+  uuidv5(`${userId}:series:${seriesId}:${localDate}`, APP_NAMESPACE);
+
 export function uuidv5(name: string, namespace: string): string {
   const ns = parseUuid(namespace);
   const nameBytes = utf8(name);

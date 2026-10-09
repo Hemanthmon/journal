@@ -6,6 +6,7 @@ import { describeError, logger } from '../../lib/logger';
 import { localDateIn, localTimeIn, safeTimeZone } from '../../lib/tz';
 import { findRecord, rowToRecord } from '../../records/records';
 import { onBlocksChanged, writeBlock } from '../calendar/blocks';
+import { ensureOccurrencesFor } from '../calendar/series';
 import { GoogleApiError, decryptToken, getGoogleApi, type EventBody, type GoogleEvent } from './client';
 import { config } from '../../config/env';
 
@@ -222,6 +223,9 @@ export function syncGoogle(userId: string, opts: { pull?: boolean; force?: boole
     if (!acc) return;
     try {
       const token = await getGoogleApi().accessToken(acc.refreshToken);
+      // Repeating blocks: make sure the coming month's occurrences exist before pushing.
+      const today = localDateIn(new Date(), acc.timezone);
+      await ensureOccurrencesFor(userId, today, addDays(today, 30), today);
       await pushChanges(acc, token);
       const due = !acc.lastPulledAt || Date.now() - acc.lastPulledAt.getTime() >= PULL_THROTTLE_MS;
       if (opts.pull !== false && (opts.force || due)) await pullChanges(acc, token);

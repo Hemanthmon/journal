@@ -5,6 +5,7 @@ import { localDateIn } from '../../lib/tz';
 import { requireIdParam } from '../../lib/rows';
 import { validateBody, validateQuery } from '../../middleware/validate';
 import { calendarView, createBlockFor, deleteBlockFor, updateBlockFor } from '../calendar/blocks';
+import { ensureOccurrencesFor } from '../calendar/series';
 import { Analyzer, firstDataDate, resolveRange } from './analytics';
 import { dashboardAuthRouter, requireDashboard, type DashboardContext } from './auth';
 import { loadOwnerData } from './data';
@@ -96,6 +97,7 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
     const c = ctx(req);
     const today = localDateIn(new Date(), c.timezone);
     const q = typeof req.query.date === 'string' && localDateSchema.safeParse(req.query.date).success ? req.query.date : today;
+    await ensureOccurrencesFor(c.ownerUserId, weekStartOf(q), addDays(weekStartOf(q), 6), today);
     res.json({ data: buildPlanner(await loadPlannerData(c.ownerUserId), today, q) });
   });
 
@@ -107,6 +109,7 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
     const from = q.from ?? weekStartOf(today);
     const to = q.to ?? addDays(from, 6);
     if (to > addDays(from, 62)) throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Choose at most two months at a time');
+    await ensureOccurrencesFor(c.ownerUserId, from, to, today);
     res.json({ data: await calendarView(c.ownerUserId, { from, to, today, canEdit: c.isOwner }) });
   });
 
