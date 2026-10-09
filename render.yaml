@@ -69,10 +69,11 @@ services:
         sync: false
       - key: MAIL_FROM_EMAIL
         sync: false
-      # Google Calendar two-way sync (optional): OAuth client from Google Cloud. Leave the
-      # client id empty to keep it off. The token key is generated once by Render.
+      # Google Calendar two-way sync: OAuth web client from Google Cloud (project
+      # journal-511110). The client id is public; the secret is set in the dashboard.
+      # The token key is generated once by Render.
       - key: GOOGLE_CLIENT_ID
-        sync: false
+        value: 302981901105-dppr39nv77ukoi3grtassaqv63qmli51.apps.googleusercontent.com
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_TOKEN_KEY
