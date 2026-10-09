@@ -13,6 +13,7 @@ import { safeTimeZone } from '../../lib/tz';
 import { validateBody } from '../../middleware/validate';
 import { findActiveGrant, findGrantById, type AccessGrant } from './access';
 import { getMailer, logMailFailure } from './mailer';
+import { trackVisit } from './visits';
 
 /**
  * Email one-time-code login for the read-only dashboard.
@@ -152,6 +153,7 @@ export async function requireDashboard(req: Request, res: Response, next: NextFu
     claims = { gid: grant.id };
     ownerUserId = grant.ownerUserId;
     grantId = grant.id;
+    void trackVisit(grant, req.get('user-agent'));
   } else {
     claims = { own: String(payload.own) };
     ownerUserId = String(payload.own);
@@ -258,7 +260,10 @@ export function dashboardAuthRouter(opts: { rateLimitMax: number }): Router {
     });
     if (!ok) throw invalidCode();
 
-    if (who.kind === 'viewer') issueSession(res, { gid: who.grant.id }, who.grant.viewerEmail);
+    if (who.kind === 'viewer') {
+      issueSession(res, { gid: who.grant.id }, who.grant.viewerEmail);
+      await trackVisit(who.grant, req.get('user-agent'), { signedIn: true });
+    }
     else issueSession(res, { own: who.userId }, email);
     res.json({ data: { signedIn: true } });
   });

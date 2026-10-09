@@ -4,6 +4,7 @@ import { Alert, View } from 'react-native';
 import type { DashboardViewer } from '@journal/shared';
 import { api, describeError } from '../../../api/client';
 import { Body, Button, Card, Divider, EmptyState, ErrorNote, Field, IconButton, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
+import { ViewerActivityCard } from '../../../components/ViewerActivityCard';
 import { API_URL } from '../../../lib/config';
 import { space, useTheme } from '../../../lib/theme';
 
@@ -122,6 +123,8 @@ export default function Sharing() {
           ))
         )}
       </Card>
+
+      <ViewerActivityCard />
 
       <Muted>Dashboard address: {API_URL.replace(/\/$/, '')}/</Muted>
     </Screen>

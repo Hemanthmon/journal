@@ -97,7 +97,7 @@ export default function Profile() {
         <Muted>{user?.email}</Muted>
         <Divider />
         <LinkRow icon="create-outline" label="Edit profile" onPress={() => router.push('/profile/account')} />
-        <LinkRow icon="people-outline" label="Dashboard access" onPress={() => router.push('/profile/sharing')} />
+        <LinkRow icon="people-outline" label="Dashboard access & activity" onPress={() => router.push('/profile/sharing')} />
         <LinkRow icon="log-out-outline" label="Log out" onPress={confirmLogout} />
       </Card>
 

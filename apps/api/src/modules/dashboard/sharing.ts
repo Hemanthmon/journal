@@ -7,6 +7,7 @@ import { validateBody } from '../../middleware/validate';
 import { findUserById } from '../auth/repo';
 import { listViewers, revokeViewer, shareAccess } from './access';
 import { getMailer, logMailFailure } from './mailer';
+import { activityFor } from './visits';
 
 /** The dashboard is served by this same server, so its address is the one the app called. */
 const dashboardUrl = (req: Request) => `${req.protocol}://${req.get('host')}/`;
@@ -39,6 +40,11 @@ export function dashboardSharingRouter(): Router {
     }
     const body: ApiSuccess<DashboardViewer> = { data: viewer };
     res.status(created ? 201 : 200).json(body);
+  });
+
+  /** Who looked at the dashboard, when and for how long (last 30 days). */
+  router.get('/activity', async (req, res) => {
+    res.json({ data: await activityFor(requireUserId(req)) });
   });
 
   router.delete('/:id', async (req, res) => {

@@ -137,6 +137,11 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
   // The owner's full editor (journal, habits, urges, planner).
   router.use('/owner', ownerRouter());
 
+  /** The website pings this every minute while visible, so visits measure time spent. */
+  router.post('/heartbeat', (_req, res) => {
+    res.status(204).end();
+  });
+
   router.get('/export.xlsx', range, async (req, res) => {
     const { a, range: r } = await analyzer(req, res);
     const file = await buildWorkbook(a, r, ctx(req).ownerName);

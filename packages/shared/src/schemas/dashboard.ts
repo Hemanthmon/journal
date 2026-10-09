@@ -439,3 +439,32 @@ export interface DashboardCalendar {
   series: CalendarSeries[];
   google: { connected: boolean; lastSyncAt: string | null };
 }
+
+// ------------------------------------------------------------------ viewer activity
+
+export interface ViewerVisit {
+  startedAt: string;
+  lastSeenAt: string;
+  /** Time on the dashboard in this visit (at least 1). */
+  minutes: number;
+  /** "Chrome on Windows", or null if unknown. */
+  device: string | null;
+  /** The visit began with a fresh sign-in (email code). */
+  signedIn: boolean;
+}
+
+export interface ViewerActivity {
+  email: string;
+  name: string | null;
+  /** Still has access (not removed). */
+  hasAccess: boolean;
+  lastSeenAt: string;
+  /** Minutes over the last 7 days. */
+  weekMinutes: number;
+  /** Newest first. */
+  visits: ViewerVisit[];
+}
+
+export interface DashboardActivity {
+  viewers: ViewerActivity[];
+}

@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router';
+import { api } from '../api';
 import { formatLongDate } from '@journal/shared';
 import { PRESETS, useRange } from '../range';
 import { useMe, useSession } from '../session';
@@ -78,8 +80,24 @@ function ThemeSelect() {
   );
 }
 
+/** While the tab is visible, tell the server once a minute (it measures time spent). */
+function useHeartbeat() {
+  useEffect(() => {
+    const beat = () => {
+      if (document.visibilityState === 'visible') void api.post('/heartbeat').catch(() => undefined);
+    };
+    const id = window.setInterval(beat, 60_000);
+    document.addEventListener('visibilitychange', beat);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', beat);
+    };
+  }, []);
+}
+
 export function Layout() {
   const me = useMe();
+  useHeartbeat();
   const { logout } = useSession();
   const { search } = useRange();
   return (
