@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
-import { addDays, formatLongDate, toLocalDate, weekdayName, weekdayOf, type IdentityRecord, type PlanGoalRecord, type PlanLevel } from '@journal/shared';
+import { addDays, formatLongDate, formatTime12, toLocalDate, weekdayName, weekdayOf, type IdentityRecord, type PlanGoalRecord, type PlanLevel } from '@journal/shared';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 import { describeError } from '../../../api/client';
@@ -135,6 +135,17 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
 
   const label = date === today ? 'Today' : date === addDays(today, 1) ? 'Tomorrow' : date === addDays(today, -1) ? 'Yesterday' : formatLongDate(date);
 
+  /** Tapping (or dragging on) empty time: a time block, or a task at that time. */
+  const addAt = (start: number, end?: number) =>
+    Alert.alert(`Add at ${formatTime12(timeOf(start))}`, undefined, [
+      {
+        text: 'Block',
+        onPress: () => router.push({ pathname: '/plan/block', params: { date, start: String(start), ...(end ? { end: String(end) } : {}) } }),
+      },
+      { text: 'Task', onPress: () => router.push({ pathname: '/plan/task', params: { date, time: timeOf(start) } }) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+
   return (
     <>
       <PeriodNav
@@ -184,8 +195,8 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
             items={data.timeline}
             identities={ids}
             nowMinutes={date === today ? new Date().getHours() * 60 + new Date().getMinutes() : null}
-            onPressEmpty={(start) => router.push({ pathname: '/plan/block', params: { date, start: String(start) } })}
-            onCreateRange={(start, end) => router.push({ pathname: '/plan/block', params: { date, start: String(start), end: String(end) } })}
+            onPressEmpty={(start) => addAt(start)}
+            onCreateRange={(start, end) => addAt(start, end)}
             onChangeBlock={(id, start, end) => {
               setError(null);
               updateBlock(ctx, id, { startTime: timeOf(start), endTime: timeOf(end) }).catch((e) => setError(describeError(e)));

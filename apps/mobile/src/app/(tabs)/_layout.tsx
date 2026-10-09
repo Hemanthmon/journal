@@ -1,12 +1,33 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs, router } from 'expo-router';
-import { View } from 'react-native';
+import { View, type ColorValue } from 'react-native';
 import { BreathFab } from '../../components/BreathFab';
 import { SyncIndicator } from '../../components/widgets';
 import { useNotificationSync } from '../../hooks/useNotificationSync';
 import { useSystemInsets } from '../../hooks/useSystemInsets';
 import { useTheme } from '../../lib/theme';
 import { useSession } from '../../state/session';
+
+type IconBase = 'home' | 'sunny' | 'leaf' | 'pulse' | 'person-circle';
+
+/** Filled icon in a soft pill for the screen you're on; outline elsewhere. */
+function TabIcon({ name, focused, color, size }: { name: IconBase; focused: boolean; color: ColorValue; size: number }) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={{
+        width: 56,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: focused ? c.primarySoft : 'transparent',
+      }}
+    >
+      <Ionicons name={focused ? name : `${name}-outline`} color={color as string} size={focused ? size : size - 2} />
+    </View>
+  );
+}
 
 export default function TabsLayout() {
   const status = useSession((s) => s.status);
@@ -28,6 +49,8 @@ function SignedInTabs() {
         safeAreaInsets={insets}
         screenOptions={{
           tabBarActiveTintColor: c.primary,
+          // The current screen's icon is filled inside a soft pill (see TabIcon).
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
           tabBarInactiveTintColor: c.muted,
           tabBarStyle: { backgroundColor: c.card, borderTopColor: c.border },
           headerStyle: { backgroundColor: c.bg },
@@ -41,14 +64,14 @@ function SignedInTabs() {
           name="index"
           options={{
             title: 'Dashboard',
-            tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+            tabBarIcon: (p) => <TabIcon name="home" {...p} />,
           }}
         />
         <Tabs.Screen
           name="routine"
           options={{
             title: 'Daily Routine',
-            tabBarIcon: ({ color, size }) => <Ionicons name="sunny-outline" color={color} size={size} />,
+            tabBarIcon: (p) => <TabIcon name="sunny" {...p} />,
           }}
         />
         <Tabs.Screen
@@ -56,7 +79,7 @@ function SignedInTabs() {
           options={{
             title: 'Plan',
             headerShown: false,
-            tabBarIcon: ({ color, size }) => <Ionicons name="leaf-outline" color={color} size={size} />,
+            tabBarIcon: (p) => <TabIcon name="leaf" {...p} />,
           }}
         />
         <Tabs.Screen
@@ -64,7 +87,7 @@ function SignedInTabs() {
           options={{
             title: 'Urge Tracker',
             headerShown: false,
-            tabBarIcon: ({ color, size }) => <Ionicons name="pulse-outline" color={color} size={size} />,
+            tabBarIcon: (p) => <TabIcon name="pulse" {...p} />,
           }}
         />
         <Tabs.Screen
@@ -72,7 +95,7 @@ function SignedInTabs() {
           options={{
             title: 'Profile',
             headerShown: false,
-            tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} />,
+            tabBarIcon: (p) => <TabIcon name="person-circle" {...p} />,
           }}
         />
       </Tabs>

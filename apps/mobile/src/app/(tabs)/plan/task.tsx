@@ -13,14 +13,14 @@ import { useCtx } from '../../../state/session';
 
 export default function TaskEditor() {
   const ctx = useCtx();
-  const params = useLocalSearchParams<{ id?: string; date?: string }>();
+  const params = useLocalSearchParams<{ id?: string; date?: string; time?: string }>();
   const isNew = !params.id;
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(params.date ?? toLocalDate());
   const [identityId, setIdentityId] = useState<string | null>(null);
   const [goalId, setGoalId] = useState<string | null>(null);
-  const [time24, setTime24] = useState<string | null>(null);
+  const [time24, setTime24] = useState<string | null>(params.time && /^\d{2}:\d{2}$/.test(params.time) ? params.time : null);
   const [place, setPlace] = useState('');
   const [twoMinute, setTwoMinute] = useState('');
   const [loaded, setLoaded] = useState(isNew);

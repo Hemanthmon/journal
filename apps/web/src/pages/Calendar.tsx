@@ -14,6 +14,7 @@ import {
   type DashboardCalendar,
 } from '@journal/shared';
 import { api, errorMessage, useApi } from '../api';
+import { newId, save } from '../owner/store';
 import { ErrorBox, Loading } from '../components/ui';
 
 const HOUR = 48; // px per hour
@@ -231,6 +232,9 @@ export function Calendar() {
   const [view, setView] = useState<ViewMode>(() => (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'week'));
   const [focus, setFocus] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  // Clicking empty time first asks: a block, or a task at that time?
+  const [choice, setChoice] = useState<{ date: string; from: number; to: number } | null>(null);
+  const [taskAt, setTaskAt] = useState<{ date: string; time: string } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -312,7 +316,7 @@ export function Calendar() {
       if (to - from < SNAP) to = Math.min(from + 60, 24 * 60 - 1); // a click: one hour
       if (to >= 24 * 60) to = 24 * 60 - 1;
       from = Math.min(from, to - SNAP);
-      setDraft({ title: '', localDate: days[d.day]!, startTime: hhmm(from), endTime: hhmm(to), color: 'sage', identityId: null, notes: null });
+      setChoice({ date: days[d.day]!, from, to });
     } else if (d.kind === 'move') {
       if (!d.moved) {
         const b = d.block;
@@ -369,13 +373,68 @@ export function Calendar() {
           <button
             className="btn primary"
             type="button"
-            onClick={() => setDraft({ title: '', localDate: view === 'day' ? at : showsToday ? today : range.from, startTime: '09:00', endTime: '10:00', color: 'sage', identityId: null, notes: null })}
+            onClick={() => {
+              const n = new Date();
+              const from = Math.min(snap(n.getHours() * 60 + n.getMinutes()), 23 * 60);
+              setChoice({ date: view === 'day' ? at : showsToday ? today : range.from, from, to: Math.min(from + 60, 24 * 60 - 1) });
+            }}
           >
             + Create
           </button>
         )}
       </div>
     </div>
+  );
+
+  const chooser = choice && (
+    <div className="modal-backdrop" onClick={() => setChoice(null)}>
+      <div className="card modal chooser" role="dialog" aria-modal="true" aria-label="Add" onClick={(e) => e.stopPropagation()}>
+        <div className="muted small">{formatLongDate(choice.date)}</div>
+        <h2 style={{ margin: '2px 0 14px' }}>Add at {formatTime12(hhmm(choice.from))}</h2>
+        <div className="chooser-options">
+          <button
+            type="button"
+            className="chooser-option"
+            autoFocus
+            onClick={() => {
+              setChoice(null);
+              setDraft({ title: '', localDate: choice.date, startTime: hhmm(choice.from), endTime: hhmm(choice.to), color: 'sage', identityId: null, notes: null });
+            }}
+          >
+            <span className="chooser-icon">▦</span>
+            <strong>Block</strong>
+            <span className="small muted">
+              {formatTime12(hhmm(choice.from))} – {formatTime12(hhmm(choice.to))}, like Deep work
+            </span>
+          </button>
+          <button
+            type="button"
+            className="chooser-option"
+            onClick={() => {
+              setChoice(null);
+              setTaskAt({ date: choice.date, time: hhmm(choice.from) });
+            }}
+          >
+            <span className="chooser-icon">☑</span>
+            <strong>Task</strong>
+            <span className="small muted">Something to tick off at {formatTime12(hhmm(choice.from))}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const taskDialog = taskAt && (
+    <TaskDialog
+      date={taskAt.date}
+      time={taskAt.time}
+      identities={data.identities}
+      onClose={() => setTaskAt(null)}
+      onSaved={() => {
+        setTaskAt(null);
+        void reload();
+      }}
+    />
   );
 
   const dialog = draft && (
@@ -438,6 +497,8 @@ export function Calendar() {
           })}
         </div>
         {dialog}
+        {chooser}
+        {taskDialog}
       </div>
     );
   }
@@ -576,6 +637,8 @@ export function Calendar() {
         </div>
       </div>
       {dialog}
+      {chooser}
+      {taskDialog}
     </div>
   );
 }
@@ -586,4 +649,117 @@ function useCalendar(from: string, to: string) {
   const [local, setLocal] = useState<DashboardCalendar | null>(null);
   useEffect(() => setLocal(data), [data]);
   return { data: local ?? data, error, reload, setData: setLocal as (fn: (d: DashboardCalendar | null) => DashboardCalendar | null) => void };
+}
+
+/** Quick task at a time, from the calendar (a planner task, shown as a task block). */
+function TaskDialog({
+  date,
+  time,
+  identities,
+  onClose,
+  onSaved,
+}: {
+  date: string;
+  time: string;
+  identities: DashboardCalendar['identities'];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [localDate, setLocalDate] = useState(date);
+  const [localTime, setLocalTime] = useState(time);
+  const [identityId, setIdentityId] = useState('');
+  const [twoMinute, setTwoMinute] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await save('planTasks', {
+        id: newId(),
+        title: title.trim(),
+        localDate,
+        identityId: identityId || null,
+        goalId: null,
+        localTime: localTime || null,
+        place: null,
+        twoMinute: twoMinute.trim() || null,
+        completedAt: null,
+        displayOrder: 0,
+      });
+      onSaved();
+    } catch (e) {
+      setError(errorMessage(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card modal" role="dialog" aria-modal="true" aria-label="New task" onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ marginTop: 0 }}>New task</h2>
+        <form
+          className="stack"
+          style={{ gap: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (title.trim()) void submit();
+          }}
+        >
+          <label className="field">
+            Task
+            <input autoFocus type="text" value={title} maxLength={200} placeholder="e.g. Read 20 pages" onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <div className="row">
+            <label className="field" style={{ flex: '1 1 140px' }}>
+              Day
+              <input type="date" value={localDate} onChange={(e) => e.target.value && setLocalDate(e.target.value)} />
+            </label>
+            <label className="field" style={{ flex: '1 1 110px' }}>
+              Time
+              <input type="time" step={300} value={localTime} onChange={(e) => setLocalTime(e.target.value)} />
+            </label>
+          </div>
+          {identities.length > 0 && (
+            <label className="field">
+              Who does this make you?
+              <select value={identityId} onChange={(e) => setIdentityId(e.target.value)}>
+                <option value="">—</option>
+                {identities.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.statement}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="field">
+            2-minute version (optional)
+            <input type="text" value={twoMinute} maxLength={200} placeholder="e.g. Open the book" onChange={(e) => setTwoMinute(e.target.value)} />
+          </label>
+          {error && (
+            <div className="error" role="alert">
+              {error}
+            </div>
+          )}
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={busy || !title.trim()}>
+              {busy ? 'Saving…' : 'Add task'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
