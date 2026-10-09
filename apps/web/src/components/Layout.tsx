@@ -5,6 +5,7 @@ import { useMe, useSession } from '../session';
 import { THEMES, type Theme, useThemePref } from '../theme';
 
 const NAV = [
+  { to: '/today', label: 'Today', icon: '✍', end: false, ownerOnly: true },
   { to: '/', label: 'Overview', icon: '◎', end: true },
   { to: '/habits', label: 'Habits', icon: '✓', end: false },
   { to: '/journal', label: 'Routine & Journal', icon: '✎', end: false },
@@ -85,7 +86,7 @@ export function Layout() {
     <div className="shell">
       <nav className="sidebar" aria-label="Main">
         <div className="brand">Journal</div>
-        {NAV.map((n) => (
+        {NAV.filter((n) => !('ownerOnly' in n) || me.isOwner).map((n) => (
           <NavLink key={n.to} to={{ pathname: n.to, search }} end={n.end} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             <span aria-hidden="true">{n.icon}</span>
             {n.label}

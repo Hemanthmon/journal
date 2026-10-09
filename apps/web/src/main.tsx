@@ -11,6 +11,7 @@ import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { Planner } from './pages/Planner';
 import { Calendar } from './pages/Calendar';
+import { Today } from './pages/Today';
 import { Urges } from './pages/Urges';
 import { SessionProvider, useSession } from './session';
 import { applyTheme } from './theme';
@@ -43,6 +44,8 @@ function App() {
         <Route path="day/:date" element={<Day />} />
         <Route path="planner" element={<Planner />} />
         <Route path="calendar" element={<Calendar />} />
+        <Route path="today" element={<Today />} />
+        <Route path="today/:date" element={<Today />} />
         <Route path="urges" element={<Urges />} />
         <Route path="*" element={<Overview />} />
       </Route>

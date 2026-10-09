@@ -884,3 +884,16 @@ input[type='time'], textarea {
   border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px; padding: 8px 10px; font: inherit; min-height: 38px;
 }
 .btn.danger { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+
+/* ---------- owner editor ---------- */
+.mood-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 10px; min-width: 64px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer; font: inherit; }
+.mood-btn span:first-child { font-size: 26px; line-height: 1.1; }
+.mood-btn:hover { border-color: var(--primary); }
+.mood-btn.on { background: var(--primary-soft); border-color: var(--primary); color: var(--text); font-weight: 600; }
+.big-check { width: 20px; height: 20px; accent-color: var(--success); cursor: pointer; flex: none; }
+.task-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.task-list li { display: flex; align-items: flex-start; gap: 10px; }
+.task-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.notice { background: var(--card-alt); border-left: 3px solid var(--warning); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+input[type='number'] { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px; padding: 8px 10px; font: inherit; min-height: 38px; }
+textarea { width: 100%; resize: vertical; line-height: 1.5; }

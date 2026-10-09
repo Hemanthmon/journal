@@ -2,7 +2,9 @@ import { useNavigate } from 'react-router';
 import { MEASUREMENT_LABELS, weekdayName, type HabitSummary, type ResolvedRange } from '@journal/shared';
 import { useApi } from '../api';
 import { Card, Empty, ErrorBox, Loading, Progress, pct } from '../components/ui';
+import { HabitsEditor } from '../owner/HabitsEditor';
 import { useRange } from '../range';
+import { useMe } from '../session';
 
 export function scheduleText(days: number[]) {
   if (days.length === 7) return 'Every day';
@@ -25,9 +27,10 @@ const STATUS_LABEL: Record<HabitSummary['status'], string> = {
 export function Habits() {
   const r = useRange();
   const nav = useNavigate();
-  const { data, error, loading } = useApi<{ range: ResolvedRange; habits: HabitSummary[] }>(r.withRange('/habits'));
+  const me = useMe();
+  const { data, error, reload } = useApi<{ range: ResolvedRange; habits: HabitSummary[] }>(r.withRange('/habits'));
   if (error) return <ErrorBox message={error} />;
-  if (loading || !data) return <Loading />;
+  if (!data) return <Loading />;
 
   return (
     <div className="stack">
@@ -85,6 +88,7 @@ export function Habits() {
       <p className="small muted">
         Completion counts only the days each habit was scheduled. Days it wasn't scheduled are never counted.
       </p>
+      {me.isOwner && <HabitsEditor onChanged={() => void reload()} />}
     </div>
   );
 }

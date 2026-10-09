@@ -9,6 +9,7 @@ import { Analyzer, firstDataDate, resolveRange } from './analytics';
 import { dashboardAuthRouter, requireDashboard, type DashboardContext } from './auth';
 import { loadOwnerData } from './data';
 import { buildWorkbook } from './export';
+import { ownerRouter } from './owner';
 import { buildPlanner, loadPlannerData } from './planner';
 
 /**
@@ -129,6 +130,9 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
     await deleteBlockFor(ctx(req).ownerUserId, req.params.id as string);
     res.status(204).end();
   });
+
+  // The owner's full editor (journal, habits, urges, planner).
+  router.use('/owner', ownerRouter());
 
   router.get('/export.xlsx', range, async (req, res) => {
     const { a, range: r } = await analyzer(req, res);

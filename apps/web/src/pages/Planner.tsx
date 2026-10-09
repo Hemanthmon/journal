@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { addDays, formatLongDate, formatShortDate, type DashboardPlanner, type PlannerGoal } from '@journal/shared';
 import { useApi } from '../api';
+import { PlannerEditor } from '../owner/PlannerEditor';
+import { useMe } from '../session';
 import { Card, Empty, ErrorBox, Loading, Progress, Stat, time12 } from '../components/ui';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -52,9 +54,11 @@ function GoalList({ goals, empty }: { goals: PlannerGoal[]; empty: string }) {
 
 export function Planner() {
   const [date, setDate] = useState<string | null>(null);
-  const { data, error, loading } = useApi<DashboardPlanner>(`/planner${date ? `?date=${date}` : ''}`);
+  const me = useMe();
+  const { data, error, reload } = useApi<DashboardPlanner>(`/planner${date ? `?date=${date}` : ''}`);
   if (error) return <ErrorBox message={error} />;
-  if (loading || !data) return <Loading />;
+  // Keep showing the current plan while it refreshes, so edits below aren't interrupted.
+  if (!data) return <Loading />;
   const { week, month } = data;
   const isCurrent = week.start <= data.today && data.today <= week.end;
   const maxVotes = Math.max(1, ...data.identities.map((i) => i.monthVotes));
@@ -211,6 +215,17 @@ export function Planner() {
           </div>
         )}
       </Card>
+
+      {me.isOwner && (
+        <PlannerEditor
+          key={week.start}
+          weekStart={week.start}
+          weekEnd={week.end}
+          monthStart={month.start}
+          monthEnd={month.end}
+          onChanged={() => void reload()}
+        />
+      )}
     </div>
   );
 }

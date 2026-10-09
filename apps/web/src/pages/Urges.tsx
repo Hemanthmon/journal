@@ -6,6 +6,7 @@ import { COLORS, ChartBox, DayLines, Legend, OUTCOME_SERIES, shortDate, tick, to
 import { DivertedRing, Insights, OutcomeCalendar, TimeHeatmap } from '../components/glance';
 import { Card, Empty, ErrorBox, Loading, Outcome, Stat, num, pct, time12, yesNo } from '../components/ui';
 import { useRange } from '../range';
+import { useMe } from '../session';
 
 function TopList({ items, color, label }: { items: { label: string; count: number }[]; color: string; label: string }) {
   if (items.length === 0) return <Empty>Nothing recorded.</Empty>;
@@ -48,6 +49,7 @@ function OutcomeBars({ items, label }: { items: ({ label: string } & OutcomeCoun
 
 export function Urges() {
   const r = useRange();
+  const me = useMe();
   const { data, error, loading } = useApi<UrgeAnalytics>(r.withRange('/urges'));
   if (error) return <ErrorBox message={error} />;
   if (loading || !data) return <Loading />;
@@ -57,7 +59,14 @@ export function Urges() {
 
   return (
     <div className="stack">
-      <h1>Urge tracker</h1>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h1 style={{ margin: 0 }}>Urge tracker</h1>
+        {me.isOwner && (
+          <Link className="btn primary" to="/today" style={{ textDecoration: 'none' }}>
+            + Log an urge
+          </Link>
+        )}
+      </div>
 
       <Card title="At a glance">
         <div className="glance">
@@ -258,6 +267,11 @@ export function Urges() {
                       <div className="small muted">
                         {u.weekday.slice(0, 3)} · {time12(u.localTime)}
                       </div>
+                      {me.isOwner && (
+                        <Link className="small" to={`/today/${u.localDate}`}>
+                          Edit
+                        </Link>
+                      )}
                     </td>
                     <td>{u.intensity}</td>
                     <td>{formatUrgeDuration(u.durationMinutes)}</td>
