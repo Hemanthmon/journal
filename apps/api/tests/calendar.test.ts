@@ -105,6 +105,19 @@ describe('owner on the website', () => {
     expect((await api.delete(`/api/dashboard/blocks/${appBlock.id}`).set('Cookie', viewerCookie)).status).toBe(403);
   });
 
+  it("can't share with their own email, and an old self-share still signs them in as owner", async () => {
+    const self = await api.post('/api/dashboard-access').set(ownerAuth).send({ name: 'Me', email: ownerEmail });
+    expect(self.status).toBe(400);
+    const [u] = await getPool().query('SELECT id FROM users WHERE email = ?', [ownerEmail]);
+    const id = (u as { id: string }[])[0]!.id;
+    await getPool().execute(
+      "INSERT INTO dashboard_access (id, owner_user_id, viewer_email, viewer_name, source, granted_at) VALUES (?, ?, ?, 'Me', 'manual', ?)",
+      [randomUUID(), id, ownerEmail, new Date()],
+    );
+    const cookie = await signIn(ownerEmail);
+    expect((await api.get('/api/dashboard/me').set('Cookie', cookie)).body.data.isOwner).toBe(true);
+  });
+
   it("ends the owner's session if the account email changes", async () => {
     const email = uniqueEmail();
     const reg = await registerUser(api, { email });

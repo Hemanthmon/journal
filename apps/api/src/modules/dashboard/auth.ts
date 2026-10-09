@@ -110,11 +110,15 @@ type Principal =
 
 async function findPrincipal(email: string): Promise<Principal | undefined> {
   if (!config.dashboard.enabled) return undefined;
-  const grant = await findActiveGrant(getPool(), email);
-  if (grant) return { kind: 'viewer', grant };
-  const [users] = await getPool().execute<Row[]>('SELECT id, name FROM users WHERE email = ?', [email]);
+  const [grant, [users]] = await Promise.all([
+    findActiveGrant(getPool(), email),
+    getPool().execute<Row[]>('SELECT id, name FROM users WHERE email = ?', [email]),
+  ]);
   const u = users[0];
-  return u ? { kind: 'owner', userId: String(u.id), name: String(u.name) } : undefined;
+  const owner = u ? { kind: 'owner' as const, userId: String(u.id), name: String(u.name) } : undefined;
+  // Sharing with your own email doesn't make you a viewer of yourself.
+  if (grant && grant.ownerUserId !== owner?.userId) return { kind: 'viewer', grant };
+  return owner;
 }
 
 /** Requires a valid dashboard session whose grant is still active. */

@@ -1,6 +1,7 @@
 import { Router, type Request } from 'express';
-import { shareDashboardSchema, type ApiSuccess, type DashboardViewer, type ShareDashboardInput } from '@journal/shared';
+import { ErrorCode, shareDashboardSchema, type ApiSuccess, type DashboardViewer, type ShareDashboardInput } from '@journal/shared';
 import { getPool } from '../../db/pool';
+import { AppError } from '../../lib/errors';
 import { requireUserId } from '../../middleware/authenticate';
 import { validateBody } from '../../middleware/validate';
 import { findUserById } from '../auth/repo';
@@ -25,6 +26,10 @@ export function dashboardSharingRouter(): Router {
   router.post('/', validateBody(shareDashboardSchema), async (req, res) => {
     const userId = requireUserId(req);
     const input = req.body as ShareDashboardInput;
+    const me = await findUserById(getPool(), userId);
+    if (me?.email === input.email) {
+      throw new AppError(400, ErrorCode.VALIDATION_ERROR, "That's your own email. Sign in to the website with it to see and edit your journal.");
+    }
     const { viewer, created } = await shareAccess(userId, input);
     if (created) {
       const owner = await findUserById(getPool(), userId);
