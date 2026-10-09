@@ -25,14 +25,15 @@ const COLOR_NAMES: Record<BlockColor, string> = {
 export default function BlockEditor() {
   const ctx = useCtx();
   const { c, dark } = useTheme();
-  const params = useLocalSearchParams<{ id?: string; date?: string; start?: string }>();
+  const params = useLocalSearchParams<{ id?: string; date?: string; start?: string; end?: string }>();
   const isNew = !params.id;
   const startParam = Math.min(23 * 60, Math.max(0, Number(params.start ?? 9 * 60) || 9 * 60));
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(params.date ?? toLocalDate());
   const [start, setStart] = useState(timeOf(startParam));
-  const [end, setEnd] = useState(timeOf(Math.min(startParam + 60, 23 * 60 + 59)));
+  const endParam = Number(params.end);
+  const [end, setEnd] = useState(timeOf(endParam > startParam ? Math.min(endParam, 23 * 60 + 59) : Math.min(startParam + 60, 23 * 60 + 59)));
   const [color, setColor] = useState<BlockColor>('sage');
   const [identityId, setIdentityId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');

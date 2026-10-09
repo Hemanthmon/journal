@@ -6,7 +6,7 @@ import { Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 import { describeError } from '../../../api/client';
 import { PeriodNav, Tally, TaskRow, VotesList, identityLabel, monthLabel, weekLabel } from '../../../components/planner';
 import { Timeline } from '../../../components/Timeline';
-import { timelineFor } from '../../../data/blocks';
+import { timeOf, timelineFor, updateBlock } from '../../../data/blocks';
 import { Body, Button, Card, Chip, EmptyState, ErrorNote, Field, Loading, Muted, ProgressBar, Screen, SectionTitle, Segmented } from '../../../components/ui';
 import {
   carryOver,
@@ -185,6 +185,11 @@ function DayView({ date, today, setDate }: { date: string; today: string; setDat
             identities={ids}
             nowMinutes={date === today ? new Date().getHours() * 60 + new Date().getMinutes() : null}
             onPressEmpty={(start) => router.push({ pathname: '/plan/block', params: { date, start: String(start) } })}
+            onCreateRange={(start, end) => router.push({ pathname: '/plan/block', params: { date, start: String(start), end: String(end) } })}
+            onChangeBlock={(id, start, end) => {
+              setError(null);
+              updateBlock(ctx, id, { startTime: timeOf(start), endTime: timeOf(end) }).catch((e) => setError(describeError(e)));
+            }}
             onPressBlock={(id) => router.push({ pathname: '/plan/block', params: { id } })}
             onPressTask={(id) => router.push({ pathname: '/plan/task', params: { id } })}
             onToggleTask={(id) => void toggle(id)}

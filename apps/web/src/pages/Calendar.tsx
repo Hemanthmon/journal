@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   BLOCK_COLORS,
   addDays,
+  formatLongDate,
   formatShortDate,
   formatTime12,
   weekStartOf,
@@ -195,95 +196,284 @@ function useNarrow() {
   return narrow;
 }
 
+type ViewMode = 'day' | 'week' | 'month';
+
+const SNAP = 15;
+const snap = (m: number) => Math.round(m / SNAP) * SNAP;
+const clampDay = (m: number) => Math.max(0, Math.min(24 * 60 - 1, m));
+const monthStart = (d: string) => `${d.slice(0, 7)}-01`;
+const monthEnd = (d: string) => {
+  const [y, m] = d.split('-').map(Number) as [number, number];
+  return addDays(m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`, -1);
+};
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** What the pointer is doing on the time grid. */
+type Drag =
+  | { kind: 'create'; day: number; from: number; to: number }
+  | { kind: 'move'; block: CalendarBlock; grabOffset: number; day: number; start: number; moved: boolean }
+  | { kind: 'resize'; block: CalendarBlock; end: number; moved: boolean };
+
+function rangeFor(view: ViewMode, focus: string) {
+  if (view === 'day') return { from: focus, to: focus };
+  if (view === 'week') {
+    const from = weekStartOf(focus);
+    return { from, to: addDays(from, 6) };
+  }
+  // Month: whole weeks covering the month, like a wall calendar.
+  const from = weekStartOf(monthStart(focus));
+  const end = monthEnd(focus);
+  return { from, to: addDays(weekStartOf(end), 6) };
+}
+
 export function Calendar() {
   const narrow = useNarrow();
-  const [anchor, setAnchor] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>(() => (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'week'));
+  const [focus, setFocus] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const weekFrom = anchor ? weekStartOf(anchor) : null;
-  const url = weekFrom ? `/calendar?from=${weekFrom}&to=${addDays(weekFrom, 6)}` : '/calendar';
-  const { data, error, loading, reload } = useApi<DashboardCalendar>(url);
-  const [day, setDay] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
   const body = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<Drag | null>(null);
+  dragRef.current = drag;
 
-  // Open at the current time this week (else the earliest block, else 8 AM), an hour early for context.
-  const shownFrom = data?.from;
+  // The server knows the owner's "today"; until the first load, use the browser's.
+  const browserToday = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const at = focus ?? browserToday;
+  const range = rangeFor(view, at);
+  const { data, error, reload, setData } = useCalendar(range.from, range.to);
+
+  // Open the time grid at the current time this period (else the earliest block, else 8 AM).
+  const shownKey = `${view}:${range.from}`;
   useEffect(() => {
-    if (!data || !body.current) return;
-    const thisWeek = data.today >= data.from && data.today <= data.to;
+    if (!data || !body.current || view === 'month') return;
+    const inRange = data.today >= data.from && data.today <= data.to;
     const now = new Date().getHours() * 60 + new Date().getMinutes();
     const first = data.blocks.length ? Math.min(...data.blocks.map((b) => mins(b.start))) : 8 * 60;
-    const focus = thisWeek ? now : first;
-    body.current.scrollTop = Math.max(0, ((focus - FIRST_HOUR * 60) / 60) * HOUR - HOUR);
-    // Only when a different week is shown, not after every edit.
+    body.current.scrollTop = Math.max(0, (((inRange ? now : first) - FIRST_HOUR * 60) / 60) * HOUR - HOUR);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shownFrom]);
+  }, [shownKey, !!data]);
 
   if (error) return <ErrorBox message={error} />;
   if (!data) return <Loading />;
 
-  const allDays = Array.from({ length: 7 }, (_, i) => addDays(data.from, i));
-  const focusDay = day && allDays.includes(day) ? day : allDays.includes(data.today) ? data.today : data.from;
-  const days = narrow ? [focusDay] : allDays;
-  const isThisWeek = allDays.includes(data.today);
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const today = data.today;
+  const days = view === 'day' ? [at] : view === 'week' ? Array.from({ length: 7 }, (_, i) => addDays(range.from, i)) : [];
+  const canEdit = data.canEdit;
 
-  const newBlock = (date: string, start: number) =>
-    data.canEdit &&
-    setDraft({ title: '', localDate: date, startTime: hhmm(start), endTime: hhmm(Math.min(start + 60, 23 * 60 + 59)), color: 'sage', identityId: null, notes: null });
+  // ---------------------------------------------------------------- pointer → time/day
+  const pointAt = (clientX: number, clientY: number) => {
+    const el = body.current!;
+    const rect = el.getBoundingClientRect();
+    const y = clientY - rect.top + el.scrollTop;
+    const minute = clampDay(FIRST_HOUR * 60 + (y / HOUR) * 60);
+    const colWidth = (rect.width - 56) / days.length;
+    const day = Math.max(0, Math.min(days.length - 1, Math.floor((clientX - rect.left - 56) / colWidth)));
+    return { minute, day };
+  };
 
-  return (
-    <div className="stack">
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0 }}>Calendar</h1>
-        <div className="row">
-          <button className="btn" type="button" aria-label="Previous week" onClick={() => setAnchor(addDays(data.from, -7))}>
-            ←
-          </button>
-          <strong>
-            {formatShortDate(data.from)} – {formatShortDate(data.to)}
-          </strong>
-          <button className="btn" type="button" aria-label="Next week" onClick={() => setAnchor(addDays(data.from, 7))}>
-            →
-          </button>
-          {!isThisWeek && (
-            <button className="btn" type="button" onClick={() => setAnchor(null)}>
-              This week
-            </button>
-          )}
-          {data.canEdit && (
-            <button className="btn primary" type="button" onClick={() => newBlock(focusDay, 9 * 60)}>
-              + Block
-            </button>
-          )}
-        </div>
+  const persist = async (b: CalendarBlock, patch: Partial<BlockInput>) => {
+    const body: BlockInput = { title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes, ...patch };
+    // Show it at once; the server confirms (or we reload on failure).
+    setData((d) => d && { ...d, blocks: d.blocks.map((x) => (x.id === b.id ? { ...x, date: body.localDate, start: body.startTime, end: body.endTime } : x)) });
+    try {
+      await api.put(`/blocks/${b.id}`, body);
+    } catch (e) {
+      setProblem(errorMessage(e));
+      void reload();
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const p = pointAt(e.clientX, e.clientY);
+    if (d.kind === 'create') setDrag({ ...d, to: snap(p.minute) });
+    else if (d.kind === 'move') {
+      const len = mins(d.block.end) - mins(d.block.start);
+      const start = Math.max(0, Math.min(24 * 60 - len, snap(p.minute - d.grabOffset)));
+      if (start !== d.start || p.day !== d.day) setDrag({ ...d, start, day: p.day, moved: true });
+    } else {
+      const end = Math.max(mins(d.block.start) + SNAP, Math.min(24 * 60 - 1, snap(p.minute)));
+      if (end !== d.end) setDrag({ ...d, end, moved: true });
+    }
+  };
+
+  const onPointerUp = () => {
+    const d = dragRef.current;
+    setDrag(null);
+    if (!d) return;
+    if (d.kind === 'create') {
+      let from = Math.min(d.from, d.to);
+      let to = Math.max(d.from, d.to);
+      if (to - from < SNAP) to = Math.min(from + 60, 24 * 60 - 1); // a click: one hour
+      if (to >= 24 * 60) to = 24 * 60 - 1;
+      from = Math.min(from, to - SNAP);
+      setDraft({ title: '', localDate: days[d.day]!, startTime: hhmm(from), endTime: hhmm(to), color: 'sage', identityId: null, notes: null });
+    } else if (d.kind === 'move') {
+      if (!d.moved) {
+        const b = d.block;
+        setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes });
+        return;
+      }
+      const len = mins(d.block.end) - mins(d.block.start);
+      void persist(d.block, { localDate: days[d.day]!, startTime: hhmm(d.start), endTime: hhmm(Math.min(d.start + len, 24 * 60 - 1)) });
+    } else if (d.moved) {
+      void persist(d.block, { endTime: hhmm(d.end) });
+    }
+  };
+
+  // ---------------------------------------------------------------- header
+  const step = view === 'day' ? 1 : view === 'week' ? 7 : 0;
+  const go = (dir: -1 | 1) => {
+    if (view === 'month') {
+      const [y, m] = monthStart(at).split('-').map(Number) as [number, number];
+      const t = y * 12 + (m - 1) + dir;
+      setFocus(`${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}-01`);
+    } else setFocus(addDays(at, dir * step));
+  };
+  const title =
+    view === 'month'
+      ? `${MONTHS[Number(monthStart(at).slice(5, 7)) - 1]} ${at.slice(0, 4)}`
+      : view === 'day'
+        ? formatLongDate(at)
+        : `${formatShortDate(range.from)} – ${formatShortDate(range.to)}`;
+  const showsToday = today >= range.from && today <= range.to;
+
+  const header = (
+    <div className="cal-toolbar">
+      <div className="row">
+        <button className="btn" type="button" onClick={() => setFocus(today)} disabled={showsToday && (view !== 'day' || at === today)}>
+          Today
+        </button>
+        <button className="btn icon" type="button" aria-label="Previous" onClick={() => go(-1)}>
+          ‹
+        </button>
+        <button className="btn icon" type="button" aria-label="Next" onClick={() => go(1)}>
+          ›
+        </button>
+        <h1 className="cal-title">{title}</h1>
       </div>
-      <p className="small muted" style={{ margin: 0 }}>
-        {data.canEdit ? 'Click an empty time to add a block, or a block to edit it. Changes reach the app on its next sync.' : 'Time blocks and timed tasks. Read-only.'}
-        {data.google.connected && ' Synced with Google Calendar.'}
-        {loading && ' Updating…'}
-      </p>
-
-      {narrow && (
-        <div className="chips" role="tablist" aria-label="Day">
-          {allDays.map((d) => (
-            <button key={d} type="button" role="tab" aria-selected={d === focusDay} className={`chip${d === focusDay ? ' on' : ''}`} onClick={() => setDay(d)}>
-              {weekdayName(weekdayOf(d))} {Number(d.slice(8))}
+      <div className="row">
+        <div className="seg" role="tablist" aria-label="View">
+          {(['day', 'week', 'month'] as const).map((v) => (
+            <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
+              {v === 'day' ? 'Day' : v === 'week' ? 'Week' : 'Month'}
             </button>
           ))}
         </div>
-      )}
+        {canEdit && (
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => setDraft({ title: '', localDate: view === 'day' ? at : showsToday ? today : range.from, startTime: '09:00', endTime: '10:00', color: 'sage', identityId: null, notes: null })}
+          >
+            + Create
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const dialog = draft && (
+    <BlockDialog
+      draft={draft}
+      identities={data.identities}
+      onClose={() => setDraft(null)}
+      onSaved={() => {
+        setDraft(null);
+        void reload();
+      }}
+    />
+  );
+
+  // ---------------------------------------------------------------- month view
+  if (view === 'month') {
+    const cells = Array.from({ length: Math.round((Date.parse(range.to) - Date.parse(range.from)) / 864e5) + 1 }, (_, i) => addDays(range.from, i));
+    const month = at.slice(0, 7);
+    return (
+      <div className="stack">
+        {header}
+        {problem && <ErrorBox message={problem} />}
+        <div className="card cal-month" style={{ padding: 0 }}>
+          {[1, 2, 3, 4, 5, 6, 7].map((w) => (
+            <div key={w} className="cal-month-head">
+              {weekdayName(w)}
+            </div>
+          ))}
+          {cells.map((d) => {
+            const blocks = data.blocks.filter((b) => b.date === d);
+            const tasks = data.tasks.filter((t) => t.date === d);
+            const items = [...blocks.map((b) => ({ key: b.id, start: b.start, label: b.title, color: b.color as string, done: false, block: b })), ...tasks.map((t) => ({ key: t.id, start: t.time, label: t.title, color: 'task', done: t.done, block: null }))].sort((a, b) => a.start.localeCompare(b.start));
+            return (
+              <div key={d} className={`cal-month-cell${d.slice(0, 7) !== month ? ' other' : ''}${d === today ? ' today' : ''}`}>
+                <button type="button" className="cal-month-day" onClick={() => (setFocus(d), setView('day'))} aria-label={`Open ${formatLongDate(d)}`}>
+                  {Number(d.slice(8))}
+                </button>
+                {items.slice(0, 3).map((it) => (
+                  <button
+                    key={it.key}
+                    type="button"
+                    className={`cal-chip ${it.color}${it.done ? ' done' : ''}`}
+                    title={`${formatTime12(it.start)} ${it.label}`}
+                    onClick={() =>
+                      it.block && canEdit
+                        ? setDraft({ id: it.block.id, title: it.block.title, localDate: it.block.date, startTime: it.block.start, endTime: it.block.end, color: it.block.color, identityId: it.block.identityId, notes: it.block.notes })
+                        : (setFocus(d), setView('day'))
+                    }
+                  >
+                    <span className="small">{formatTime12(it.start).replace(':00', '')}</span> {it.label}
+                  </button>
+                ))}
+                {items.length > 3 && (
+                  <button type="button" className="cal-more" onClick={() => (setFocus(d), setView('day'))}>
+                    +{items.length - 3} more
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {dialog}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------- day / week grid
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  return (
+    <div className="stack">
+      {header}
+      <p className="small muted" style={{ margin: 0 }}>
+        {canEdit
+          ? 'Drag on empty time to create a block. Drag a block to move it (even to another day), or its bottom edge to resize. Click a block to edit.'
+          : 'Time blocks and timed tasks. Read-only.'}
+        {data.google.connected && ' Synced with Google Calendar.'}
+      </p>
+      {problem && <ErrorBox message={problem} />}
+      {narrow && view === 'week' && <p className="small muted" style={{ margin: 0 }}>Tip: the Day view is easier on a phone.</p>}
 
       <div className="card cal" style={{ padding: 0 }}>
         <div className="cal-head" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
           <div />
           {days.map((d) => (
-            <div key={d} className={`cal-day-head${d === data.today ? ' today' : ''}`}>
+            <button key={d} type="button" className={`cal-day-head${d === today ? ' today' : ''}`} onClick={() => (setFocus(d), setView('day'))}>
               <span className="small muted">{weekdayName(weekdayOf(d))}</span>
               <strong>{Number(d.slice(8))}</strong>
-            </div>
+            </button>
           ))}
         </div>
-        <div ref={body} className="cal-body" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
+        <div
+          ref={body}
+          className={`cal-body${drag ? ' dragging' : ''}`}
+          style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => setDrag(null)}
+        >
           <div className="cal-gutter" style={{ height: (LAST_HOUR - FIRST_HOUR) * HOUR }}>
             {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => (
               <div key={i} className="cal-hour-label" style={{ top: i * HOUR }}>
@@ -291,43 +481,68 @@ export function Calendar() {
               </div>
             ))}
           </div>
-          {days.map((d) => {
+          {days.map((d, dayIndex) => {
+            // While moving, the dragged block is drawn where it would land.
+            const blocks = data.blocks
+              .filter((b) => !(drag && drag.kind !== 'create' && drag.block.id === b.id))
+              .filter((b) => b.date === d);
+            const ghost =
+              drag?.kind === 'move' && drag.day === dayIndex
+                ? { ...drag.block, start: hhmm(drag.start), end: hhmm(Math.min(drag.start + mins(drag.block.end) - mins(drag.block.start), 24 * 60 - 1)) }
+                : drag?.kind === 'resize' && drag.block.date === d
+                  ? { ...drag.block, end: hhmm(drag.end) }
+                  : null;
             const items: Item[] = [
-              ...data.blocks.filter((b) => b.date === d).map((b) => ({ kind: 'block' as const, b, start: mins(b.start), end: mins(b.end) })),
+              ...blocks.map((b) => ({ kind: 'block' as const, b, start: mins(b.start), end: mins(b.end) })),
+              ...(ghost ? [{ kind: 'block' as const, b: ghost, start: mins(ghost.start), end: mins(ghost.end) }] : []),
               ...data.tasks.filter((t) => t.date === d).map((t) => ({ kind: 'task' as const, t, start: mins(t.time), end: Math.min(mins(t.time) + 30, 24 * 60) })),
             ];
+            const top = (m: number) => ((Math.max(m, FIRST_HOUR * 60) - FIRST_HOUR * 60) / 60) * HOUR;
             return (
-              <div key={d} className={`cal-col${data.canEdit ? ' editable' : ''}`} style={{ height: (LAST_HOUR - FIRST_HOUR) * HOUR }}>
-                {Array.from({ length: (LAST_HOUR - FIRST_HOUR) * 2 }, (_, i) => {
-                  const start = FIRST_HOUR * 60 + i * 30;
-                  return (
-                    <div
-                      key={i}
-                      className={`cal-slot${i % 2 === 0 ? ' hour' : ''}`}
-                      style={{ top: i * (HOUR / 2), height: HOUR / 2 }}
-                      onClick={() => newBlock(d, start)}
-                      title={data.canEdit ? `Add a block at ${formatTime12(hhmm(start))}` : undefined}
-                    />
-                  );
-                })}
+              <div
+                key={d}
+                className={`cal-col${canEdit ? ' editable' : ''}`}
+                style={{ height: (LAST_HOUR - FIRST_HOUR) * HOUR }}
+                onPointerDown={(e) => {
+                  if (!canEdit || e.button !== 0 || e.target !== e.currentTarget) return;
+                  const p = pointAt(e.clientX, e.clientY);
+                  const m = Math.floor(p.minute / SNAP) * SNAP;
+                  (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId);
+                  setDrag({ kind: 'create', day: dayIndex, from: m, to: m });
+                }}
+              >
+                {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => (
+                  <div key={i} className="cal-hour-line" style={{ top: i * HOUR }} />
+                ))}
                 {layout(items).map(({ item, col, cols }) => {
-                  const top = ((Math.max(item.start, FIRST_HOUR * 60) - FIRST_HOUR * 60) / 60) * HOUR;
-                  const height = Math.max(20, ((item.end - Math.max(item.start, FIRST_HOUR * 60)) / 60) * HOUR - 2);
-                  const style = { top, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` };
+                  const t0 = top(item.start);
+                  const height = Math.max(18, ((item.end - Math.max(item.start, FIRST_HOUR * 60)) / 60) * HOUR - 2);
+                  const style = { top: t0, height, left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)` };
                   if (item.kind === 'block') {
                     const b = item.b;
+                    const isGhost = !!ghost && b === ghost;
                     return (
-                      <button
-                        key={b.id}
-                        type="button"
-                        className={`cal-block ${b.color}`}
+                      <div
+                        key={isGhost ? 'ghost' : b.id}
+                        role="button"
+                        tabIndex={0}
+                        className={`cal-block ${b.color}${isGhost ? ' ghost' : ''}${canEdit ? ' draggable' : ''}`}
                         style={style}
-                        disabled={!data.canEdit}
                         title={[b.title, `${formatTime12(b.start)} – ${formatTime12(b.end)}`, b.identity, b.notes].filter(Boolean).join('\n')}
-                        onClick={() =>
-                          data.canEdit &&
-                          setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes })
-                        }
+                        onKeyDown={(e) => {
+                          if (canEdit && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            setDraft({ id: b.id, title: b.title, localDate: b.date, startTime: b.start, endTime: b.end, color: b.color, identityId: b.identityId, notes: b.notes });
+                          }
+                        }}
+                        onPointerDown={(e) => {
+                          if (!canEdit || e.button !== 0) return;
+                          e.stopPropagation();
+                          const p = pointAt(e.clientX, e.clientY);
+                          (body.current as HTMLElement).setPointerCapture(e.pointerId);
+                          const resize = (e.target as HTMLElement).classList.contains('cal-resize');
+                          setDrag(resize ? { kind: 'resize', block: b, end: mins(b.end), moved: false } : { kind: 'move', block: b, grabOffset: p.minute - mins(b.start), day: dayIndex, start: mins(b.start), moved: false });
+                        }}
                       >
                         <strong>{b.title}</strong>
                         {height > 34 && (
@@ -335,7 +550,8 @@ export function Calendar() {
                             {formatTime12(b.start)} – {formatTime12(b.end)}
                           </span>
                         )}
-                      </button>
+                        {canEdit && <span className="cal-resize" aria-hidden="true" />}
+                      </div>
                     );
                   }
                   const t = item.t;
@@ -345,24 +561,29 @@ export function Calendar() {
                     </div>
                   );
                 })}
-                {d === data.today && nowMin >= FIRST_HOUR * 60 && <div className="cal-now" style={{ top: ((nowMin - FIRST_HOUR * 60) / 60) * HOUR }} />}
+                {drag?.kind === 'create' && drag.day === dayIndex && (
+                  <div className="cal-block sage ghost" style={{ top: top(Math.min(drag.from, drag.to)), height: Math.max(12, (Math.abs(drag.to - drag.from) / 60) * HOUR), left: 2, right: 2 }}>
+                    <strong>New block</strong>
+                    <span>
+                      {formatTime12(hhmm(Math.min(drag.from, drag.to)))} – {formatTime12(hhmm(Math.max(drag.from, drag.to, Math.min(drag.from, drag.to) + SNAP)))}
+                    </span>
+                  </div>
+                )}
+                {d === today && nowMin >= FIRST_HOUR * 60 && <div className="cal-now" style={{ top: top(nowMin) }} />}
               </div>
             );
           })}
         </div>
       </div>
-
-      {draft && (
-        <BlockDialog
-          draft={draft}
-          identities={data.identities}
-          onClose={() => setDraft(null)}
-          onSaved={() => {
-            setDraft(null);
-            void reload();
-          }}
-        />
-      )}
+      {dialog}
     </div>
   );
+}
+
+/** Calendar data with a setter for optimistic updates while dragging. */
+function useCalendar(from: string, to: string) {
+  const { data, error, reload } = useApi<DashboardCalendar>(`/calendar?from=${from}&to=${to}`);
+  const [local, setLocal] = useState<DashboardCalendar | null>(null);
+  useEffect(() => setLocal(data), [data]);
+  return { data: local ?? data, error, reload, setData: setLocal as (fn: (d: DashboardCalendar | null) => DashboardCalendar | null) => void };
 }
