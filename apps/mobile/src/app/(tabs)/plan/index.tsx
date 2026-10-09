@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { addDays, formatLongDate, toLocalDate, weekdayName, weekdayOf, type IdentityRecord, type PlanGoalRecord, type PlanLevel } from '@journal/shared';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 import { describeError } from '../../../api/client';
 import { PeriodNav, Tally, TaskRow, VotesList, identityLabel, monthLabel, weekLabel } from '../../../components/planner';
 import { Timeline } from '../../../components/Timeline';
@@ -26,6 +26,7 @@ import {
 } from '../../../data/planner';
 import { font, radius, space, useTheme } from '../../../lib/theme';
 import { useCtx } from '../../../state/session';
+import { syncService } from '../../../state/sync';
 
 type View_ = 'day' | 'week' | 'month';
 
@@ -44,8 +45,19 @@ export default function Plan() {
     }, [today]),
   );
 
+  const [refreshing, setRefreshing] = useState(false);
+  // Pull down to sync now, which also brings in Google Calendar changes.
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await syncService.syncNow();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
-    <Screen>
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}>
       <Segmented
         options={[
           { value: 'day', label: 'Day' },
