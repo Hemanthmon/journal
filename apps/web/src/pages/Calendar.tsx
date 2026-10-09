@@ -232,10 +232,11 @@ const monthEnd = (d: string) => {
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** What the pointer is doing on the time grid. */
+/** `raw*` follow the pointer minute by minute (smooth); the others snap to 15 minutes. */
 type Drag =
-  | { kind: 'create'; day: number; from: number; to: number }
-  | { kind: 'move'; block: CalendarBlock; grabOffset: number; day: number; start: number; moved: boolean }
-  | { kind: 'resize'; block: CalendarBlock; end: number; moved: boolean };
+  | { kind: 'create'; day: number; from: number; to: number; rawTo: number }
+  | { kind: 'move'; block: CalendarBlock; grabOffset: number; day: number; start: number; rawStart: number; moved: boolean }
+  | { kind: 'resize'; block: CalendarBlock; end: number; rawEnd: number; moved: boolean };
 
 function rangeFor(view: ViewMode, focus: string) {
   if (view === 'day') return { from: focus, to: focus };
@@ -317,14 +318,17 @@ export function Calendar() {
     const d = dragRef.current;
     if (!d) return;
     const p = pointAt(e.clientX, e.clientY);
-    if (d.kind === 'create') setDrag({ ...d, to: snap(p.minute) });
+    const m = Math.round(p.minute);
+    if (d.kind === 'create') setDrag({ ...d, to: snap(m), rawTo: m });
     else if (d.kind === 'move') {
       const len = mins(d.block.end) - mins(d.block.start);
-      const start = Math.max(0, Math.min(24 * 60 - len, snap(p.minute - d.grabOffset)));
-      if (start !== d.start || p.day !== d.day) setDrag({ ...d, start, day: p.day, moved: true });
+      const rawStart = Math.max(0, Math.min(24 * 60 - 1 - len, m - d.grabOffset));
+      const start = Math.max(0, Math.min(24 * 60 - 1 - len, snap(rawStart)));
+      if (rawStart !== d.rawStart || p.day !== d.day) setDrag({ ...d, start, rawStart, day: p.day, moved: d.moved || start !== mins(d.block.start) || p.day !== d.day });
     } else {
-      const end = Math.max(mins(d.block.start) + SNAP, Math.min(24 * 60 - 1, snap(p.minute)));
-      if (end !== d.end) setDrag({ ...d, end, moved: true });
+      const rawEnd = Math.max(mins(d.block.start) + SNAP, Math.min(24 * 60 - 1, m));
+      const end = Math.max(mins(d.block.start) + SNAP, Math.min(24 * 60 - 1, snap(m)));
+      if (rawEnd !== d.rawEnd) setDrag({ ...d, end, rawEnd, moved: d.moved || end !== mins(d.block.end) });
     }
   };
 
@@ -570,12 +574,20 @@ export function Calendar() {
             const blocks = data.blocks
               .filter((b) => !(drag && drag.kind !== 'create' && drag.block.id === b.id))
               .filter((b) => b.date === d);
+            // Drawn at the pointer's exact minute; its label shows where it will snap to.
+            const len = drag && drag.kind !== 'create' ? mins(drag.block.end) - mins(drag.block.start) : 0;
             const ghost =
               drag?.kind === 'move' && drag.day === dayIndex
-                ? { ...drag.block, start: hhmm(drag.start), end: hhmm(Math.min(drag.start + mins(drag.block.end) - mins(drag.block.start), 24 * 60 - 1)) }
+                ? { ...drag.block, start: hhmm(drag.rawStart), end: hhmm(drag.rawStart + len) }
                 : drag?.kind === 'resize' && drag.block.date === d
-                  ? { ...drag.block, end: hhmm(drag.end) }
+                  ? { ...drag.block, end: hhmm(drag.rawEnd) }
                   : null;
+            const ghostLabel =
+              drag?.kind === 'move'
+                ? `${formatTime12(hhmm(drag.start))} – ${formatTime12(hhmm(drag.start + len))}`
+                : drag?.kind === 'resize'
+                  ? `${formatTime12(drag.block.start)} – ${formatTime12(hhmm(drag.end))}`
+                  : '';
             const items: Item[] = [
               ...blocks.map((b) => ({ kind: 'block' as const, b, start: mins(b.start), end: mins(b.end) })),
               ...(ghost ? [{ kind: 'block' as const, b: ghost, start: mins(ghost.start), end: mins(ghost.end) }] : []),
@@ -592,7 +604,7 @@ export function Calendar() {
                   const p = pointAt(e.clientX, e.clientY);
                   const m = Math.floor(p.minute / SNAP) * SNAP;
                   (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId);
-                  setDrag({ kind: 'create', day: dayIndex, from: m, to: m });
+                  setDrag({ kind: 'create', day: dayIndex, from: m, to: m, rawTo: m });
                 }}
               >
                 {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => (
@@ -625,15 +637,15 @@ export function Calendar() {
                           const p = pointAt(e.clientX, e.clientY);
                           (body.current as HTMLElement).setPointerCapture(e.pointerId);
                           const resize = (e.target as HTMLElement).classList.contains('cal-resize');
-                          setDrag(resize ? { kind: 'resize', block: b, end: mins(b.end), moved: false } : { kind: 'move', block: b, grabOffset: p.minute - mins(b.start), day: dayIndex, start: mins(b.start), moved: false });
+                          setDrag(
+                            resize
+                              ? { kind: 'resize', block: b, end: mins(b.end), rawEnd: mins(b.end), moved: false }
+                              : { kind: 'move', block: b, grabOffset: Math.round(p.minute) - mins(b.start), day: dayIndex, start: mins(b.start), rawStart: mins(b.start), moved: false },
+                          );
                         }}
                       >
                         <strong>{b.title}</strong>
-                        {height > 34 && (
-                          <span>
-                            {formatTime12(b.start)} – {formatTime12(b.end)}
-                          </span>
-                        )}
+                        {(height > 34 || isGhost) && <span>{isGhost ? ghostLabel : `${formatTime12(b.start)} – ${formatTime12(b.end)}`}</span>}
                         {canEdit && <span className="cal-resize" aria-hidden="true" />}
                       </div>
                     );
@@ -646,7 +658,7 @@ export function Calendar() {
                   );
                 })}
                 {drag?.kind === 'create' && drag.day === dayIndex && (
-                  <div className="cal-block sage ghost" style={{ top: top(Math.min(drag.from, drag.to)), height: Math.max(12, (Math.abs(drag.to - drag.from) / 60) * HOUR), left: 2, right: 2 }}>
+                  <div className="cal-block sage ghost" style={{ top: top(Math.min(drag.from, drag.rawTo)), height: Math.max(12, (Math.abs(drag.rawTo - drag.from) / 60) * HOUR), left: 2, right: 2 }}>
                     <strong>New block</strong>
                     <span>
                       {formatTime12(hhmm(Math.min(drag.from, drag.to)))} – {formatTime12(hhmm(Math.max(drag.from, drag.to, Math.min(drag.from, drag.to) + SNAP)))}
