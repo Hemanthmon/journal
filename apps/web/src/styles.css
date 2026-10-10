@@ -955,3 +955,39 @@ button.cal-day-head:hover { background: var(--card-alt); }
 .chooser-option:hover, .chooser-option:focus-visible { border-color: var(--primary); background: var(--primary-soft); outline: none; }
 .chooser-icon { font-size: 22px; color: var(--primary); }
 @media (max-width: 420px) { .chooser-options { grid-template-columns: 1fr; } }
+
+/* ---------- journal: diary pages ---------- */
+.diary-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.diary-jump { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.diary-page {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 32px 40px 28px;
+  animation: diary-turn 0.25s ease-out;
+}
+@keyframes diary-turn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .diary-page { animation: none; } }
+.diary-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+.diary-weekday { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+.diary-date { margin: 2px 0 0; font-family: Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 600; }
+.diary-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.diary-chip { background: var(--card-alt); color: var(--text); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; }
+.diary-chip.good { background: var(--success-soft); color: var(--success); }
+.diary-entry { margin-bottom: 22px; }
+.diary-entry h3 { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.diary-entry p { margin: 0; white-space: pre-wrap; font-family: Georgia, 'Times New Roman', serif; font-size: 18px; line-height: 1.75; color: var(--text); }
+.diary-empty { font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: var(--muted); font-size: 17px; }
+.diary-foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; border-top: 1px dashed var(--border); padding-top: 18px; margin-top: 8px; }
+.diary-foot h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.diary-foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.diary-foot li.done { color: var(--success); }
+@media (max-width: 640px) {
+  .diary-page { padding: 22px 18px; border-radius: 14px; }
+  .diary-date { font-size: 24px; }
+  .diary-entry p { font-size: 17px; }
+}
