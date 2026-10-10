@@ -840,11 +840,13 @@ h3.sub {
   --blk-sand: #3a3220; --blk-sand-a: #cdb27a; --blk-sand-t: #f4eddc;
 }
 .cal { overflow: hidden; }
-.cal-head, .cal-body { display: grid; }
-.cal-head { border-bottom: 1px solid var(--border); }
+/* Scoped to .cal: the Overview's day calendar also uses .cal-head / .cal-body. */
+.cal .cal-head, .cal .cal-body { display: grid; }
+.cal .cal-head, .cal .cal-body { gap: 0; font-size: inherit; font-weight: inherit; color: inherit; text-align: initial; }
+.cal .cal-head { border-bottom: 1px solid var(--border); }
 .cal-day-head { display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 2px; }
 .cal-day-head.today strong { background: var(--primary); color: var(--primary-text); border-radius: 999px; padding: 0 8px; }
-.cal-body { max-height: 70vh; overflow-y: auto; position: relative; }
+.cal .cal-body { max-height: 70vh; overflow-y: auto; position: relative; }
 .cal-gutter { position: relative; }
 .cal-hour-label { position: absolute; right: 8px; transform: translateY(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
 .cal-col { position: relative; border-left: 1px solid var(--border); }
@@ -910,7 +912,7 @@ button.cal-day-head { border: none; background: none; color: inherit; font: inhe
 button.cal-day-head:hover { background: var(--card-alt); }
 .cal-hour-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border); pointer-events: none; }
 .cal-col.editable { cursor: crosshair; }
-.cal-body.dragging, .cal-body.dragging * { user-select: none; cursor: grabbing !important; }
+.cal .cal-body.dragging, .cal .cal-body.dragging * { user-select: none; cursor: grabbing !important; }
 .cal-block { user-select: none; }
 .cal-block.draggable { cursor: grab; touch-action: none; }
 .cal-block.ghost { opacity: 0.85; box-shadow: 0 6px 18px rgba(20, 30, 60, 0.18); z-index: 3; pointer-events: none; }
