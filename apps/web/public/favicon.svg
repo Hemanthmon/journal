@@ -1,1 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#4E6FCB"/><path d="M20 44V20h14a10 10 0 0 1 0 20h-6" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7E6D3"/>
+      <stop offset="0.55" stop-color="#E9F0E2"/>
+      <stop offset="1" stop-color="#CFE3D2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FBE3CC" stop-opacity="1"/>
+      <stop offset="1" stop-color="#FBE3CC" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#sky)"/>
+  <circle cx="512" cy="470" r="330" fill="url(#glow)"/>
+  <circle cx="512" cy="470" r="178" fill="#F7C59F" opacity="0.9"/>
+  <defs>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7FB592"/>
+      <stop offset="1" stop-color="#2F5E46"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="512" cy="812" rx="250" ry="44" fill="#3F7358" opacity="1"/>
+  <path d="M512 806 C 506 712, 500 628, 512 548" fill="none" stroke="#2F5E46" stroke-width="30" stroke-linecap="round"/>
+  <path d="M512 560 C 556 446, 652 382, 772 372 C 756 486, 664 572, 512 560 Z" fill="url(#leaf)"/>
+  <path d="M512 618 C 470 532, 386 486, 282 488 C 300 586, 392 642, 512 618 Z" fill="url(#leaf)"/>
+  <path d="M530 546 C 590 480, 660 430, 740 396" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="8" stroke-linecap="round"/>
+  <path d="M496 604 C 450 560, 390 530, 318 512" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="7" stroke-linecap="round"/></svg>
