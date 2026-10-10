@@ -10,6 +10,7 @@ import { Analyzer, firstDataDate, resolveRange } from './analytics';
 import { dashboardAuthRouter, requireDashboard, type DashboardContext } from './auth';
 import { loadOwnerData } from './data';
 import { buildWorkbook } from './export';
+import { highlightsRouter } from './highlights';
 import { ownerRouter } from './owner';
 import { buildPlanner, loadPlannerData } from './planner';
 
@@ -136,6 +137,9 @@ export function dashboardRouter(opts: { rateLimitMax: number }): Router {
 
   // The owner's full editor (journal, habits, urges, planner).
   router.use('/owner', ownerRouter());
+
+  // Highlights on diary pages (viewers and the owner).
+  router.use('/highlights', highlightsRouter());
 
   /** The website pings this every minute while visible, so visits measure time spent. */
   router.post('/heartbeat', (_req, res) => {

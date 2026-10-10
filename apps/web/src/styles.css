@@ -991,3 +991,28 @@ button.cal-day-head:hover { background: var(--card-alt); }
   .diary-date { font-size: 24px; }
   .diary-entry p { font-size: 17px; }
 }
+
+/* ---------- diary: highlights and urge cards ---------- */
+:root { --hl: #fde68a; --hl-owner: #bbf7d0; --hl-text: #3b2f0b; }
+:root[data-theme='dark'] { --hl: #6b5a1a; --hl-owner: #1f5136; --hl-text: #fdf6d8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --hl: #6b5a1a; --hl-owner: #1f5136; --hl-text: #fdf6d8; } }
+mark.hl { background: var(--hl); color: var(--hl-text); border-radius: 3px; padding: 0 2px; cursor: pointer; }
+mark.hl.owner { background: var(--hl-owner); }
+mark.hl:focus-visible { outline: 2px solid var(--primary); }
+.diary-hint { margin: -10px 0 18px; font-size: 12px; color: var(--muted); }
+.hl-chip { background: var(--hl); color: var(--hl-text); }
+.hl-pop { position: fixed; transform: translateX(-50%); z-index: 60; width: min(300px, calc(100vw - 24px)); background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 10px 30px rgba(20, 30, 60, 0.2); }
+.hl-pop input { width: 100%; }
+.diary-section-title { margin: 6px 0 12px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.diary-urges { margin: 8px 0 22px; display: flex; flex-direction: column; gap: 14px; }
+.urge-card { border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; background: var(--card-alt); }
+.urge-card.highlighted { border-color: #e6c34a; box-shadow: inset 4px 0 0 #e6c34a; }
+.urge-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.urge-intensity { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.urge-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.urge-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7fb592, #e0a27e, #d88ea1); }
+.urge-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 15px; }
+.urge-facts dt { color: var(--muted); font-size: 13px; font-weight: 600; padding-top: 2px; }
+.urge-facts dd { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.urge-hls { list-style: none; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+@media (max-width: 640px) { .urge-facts { grid-template-columns: 1fr; gap: 2px; } .urge-facts dd { margin-bottom: 8px; } }

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { formatLongDate, formatShortDate, type DayDetail, type DaySummary, type ResolvedRange } from '@journal/shared';
-import { useApi } from '../api';
+import { formatLongDate, formatShortDate, type DayDetail, type DaySummary, type Highlight, type HighlightInput, type ResolvedRange } from '@journal/shared';
+import { api, errorMessage, useApi } from '../api';
+import { useMe } from '../session';
 import { DiaryPage } from '../components/DiaryPage';
 import { Card, Empty, ErrorBox, Loading, Mood, pct } from '../components/ui';
 import { useRange } from '../range';
@@ -23,6 +24,26 @@ export function Journal() {
   const index = pages.length ? Math.max(0, asked ? pages.findIndex((d) => d.date === asked) : pages.length - 1) : -1;
   const current = index >= 0 ? pages[index] : undefined;
   const { data: day, error: dayError } = useApi<DayDetail>(view === 'pages' && current ? `/days/${current.date}` : null);
+  const me = useMe();
+  const { data: highlights, reload: reloadHighlights } = useApi<Highlight[]>(
+    view === 'pages' && current ? `/highlights?from=${current.date}&to=${current.date}` : null,
+  );
+  const highlight = async (h: HighlightInput) => {
+    try {
+      await api.post('/highlights', h);
+    } catch (e) {
+      throw new Error(errorMessage(e));
+    }
+    await reloadHighlights();
+  };
+  const unhighlight = async (id: string) => {
+    try {
+      await api.delete(`/highlights/${id}`);
+    } catch (e) {
+      throw new Error(errorMessage(e));
+    }
+    await reloadHighlights();
+  };
 
   const setParam = (key: string, value: string | null) =>
     setParams(
@@ -139,10 +160,18 @@ export function Journal() {
         </button>
       </nav>
 
-      {dayError ? <ErrorBox message={dayError} /> : !day || day.date !== current!.date ? <Loading /> : <DiaryPage day={day} />}
+      {dayError ? <ErrorBox message={dayError} /> : !day || day.date !== current!.date ? <Loading /> : (
+        <DiaryPage
+          day={day}
+          highlights={(highlights ?? []).filter((h) => h.date === day.date)}
+          canRemoveAny={me.isOwner}
+          onHighlight={highlight}
+          onRemove={unhighlight}
+        />
+      )}
 
       <p className="small muted" style={{ textAlign: 'center', margin: 0 }}>
-        Tip: use ← and → to turn pages. Pages follow the date range at the top.{' '}
+        Tip: use ← and → to turn pages, and select words to highlight them. Pages follow the date range at the top.{' '}
         <Link to={{ pathname: `/day/${current!.date}`, search: r.search }}>Full details for this day</Link>
       </p>
     </div>

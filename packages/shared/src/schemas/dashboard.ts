@@ -468,3 +468,41 @@ export interface ViewerActivity {
 export interface DashboardActivity {
   viewers: ViewerActivity[];
 }
+
+// ------------------------------------------------------------------ highlights
+
+/** Highlight a passage of a journal answer, or a whole urge, with an optional note. */
+export const highlightInputSchema = z
+  .object({
+    kind: z.enum(['answer', 'urge']),
+    date: localDateSchema,
+    /** answer: the question id; urge: the urge id */
+    targetId: idSchema,
+    quote: z.string().trim().min(1).max(2000).nullable().optional(),
+    start: z.number().int().min(0).nullable().optional(),
+    end: z.number().int().min(1).nullable().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict()
+  .refine((h) => h.kind === 'urge' || (h.quote && h.start != null && h.end != null && h.end > h.start), {
+    message: 'Select some words to highlight',
+    path: ['quote'],
+  });
+export type HighlightInput = z.input<typeof highlightInputSchema>;
+
+export interface Highlight {
+  id: string;
+  kind: 'answer' | 'urge';
+  date: string;
+  targetId: string;
+  quote: string | null;
+  start: number | null;
+  end: number | null;
+  note: string | null;
+  /** Who made it: the viewer's name (or email), or "You" for the owner's own. */
+  author: string;
+  authorIsOwner: boolean;
+  /** The signed-in person made it (and so may remove it; the owner may remove any). */
+  mine: boolean;
+  createdAt: string;
+}

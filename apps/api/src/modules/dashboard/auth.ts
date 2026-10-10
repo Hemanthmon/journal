@@ -93,6 +93,8 @@ export interface DashboardContext {
   /** null for the owner's own session. */
   grantId: string | null;
   viewerEmail: string;
+  /** As the owner named them when sharing (null for the owner, or if not given). */
+  viewerName: string | null;
   ownerUserId: string;
   ownerName: string;
   timezone: string;
@@ -147,12 +149,14 @@ export async function requireDashboard(req: Request, res: Response, next: NextFu
   let claims: SessionClaims;
   let ownerUserId: string;
   let grantId: string | null = null;
+  let viewerName: string | null = null;
   if (typeof payload.gid === 'string') {
     const grant = await findGrantById(getPool(), payload.gid);
     if (!grant || grant.viewerEmail !== payload.sub) return ended();
     claims = { gid: grant.id };
     ownerUserId = grant.ownerUserId;
     grantId = grant.id;
+    viewerName = grant.viewerName;
     void trackVisit(grant, req.get('user-agent'));
   } else {
     claims = { own: String(payload.own) };
@@ -166,6 +170,7 @@ export async function requireDashboard(req: Request, res: Response, next: NextFu
   req.dashboard = {
     grantId,
     viewerEmail: String(payload.sub),
+    viewerName,
     ownerUserId,
     ownerName: String(owner.name),
     timezone: safeTimeZone(String(owner.timezone)),
