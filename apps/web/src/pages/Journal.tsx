@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { formatLongDate, formatShortDate, type DayDetail, type DaySummary, type Highlight, type HighlightInput, type ResolvedRange } from '@journal/shared';
 import { api, errorMessage, useApi } from '../api';
@@ -11,6 +11,66 @@ import { useRange } from '../range';
  * Routine & journal, read like a diary: one day per page, newest first, with previous /
  * next (buttons or ← → keys) and a jump list. A list view of all days is one click away.
  */
+/**
+ * Diary pages are kept for a couple of minutes and the neighbouring pages are fetched in
+ * the background, so turning a page shows it at once.
+ */
+interface PageData {
+  day: DayDetail;
+  highlights: Highlight[];
+}
+const PAGE_TTL_MS = 2 * 60 * 1000;
+const pageCache = new Map<string, { at: number; data: Promise<PageData> }>();
+
+function fetchPage(date: string, fresh = false): Promise<PageData> {
+  const hit = pageCache.get(date);
+  if (!fresh && hit && Date.now() - hit.at < PAGE_TTL_MS) return hit.data;
+  const data = Promise.all([
+    api.get<{ data: DayDetail }>(`/days/${date}`),
+    api.get<{ data: Highlight[] }>(`/highlights?from=${date}&to=${date}`),
+  ]).then(([d, h]) => ({ day: d.data.data, highlights: h.data.data }));
+  pageCache.set(date, { at: Date.now(), data });
+  // A failed fetch isn't kept, so the next try asks again.
+  data.catch(() => pageCache.delete(date));
+  return data;
+}
+
+function usePage(date: string | null, neighbours: string[]) {
+  const [state, setState] = useState<{ date: string; data?: PageData; error?: string } | null>(null);
+  const load = useCallback(
+    async (fresh = false) => {
+      if (!date) return;
+      try {
+        const data = await fetchPage(date, fresh);
+        setState({ date, data });
+      } catch (e) {
+        setState({ date, error: errorMessage(e) });
+      }
+    },
+    [date],
+  );
+  useEffect(() => {
+    if (!date) return;
+    let alive = true;
+    const hit = pageCache.get(date);
+    if (!hit) setState({ date });
+    void fetchPage(date)
+      .then((data) => alive && setState({ date, data }))
+      .catch((e) => alive && setState({ date, error: errorMessage(e) }));
+    return () => {
+      alive = false;
+    };
+  }, [date]);
+  // Warm up the pages around this one (after it has loaded, so it comes first).
+  const key = neighbours.join(',');
+  useEffect(() => {
+    if (!state?.data) return;
+    for (const d of key.split(',').filter(Boolean)) void fetchPage(d).catch(() => undefined);
+  }, [state?.data, key]);
+  const current = state && state.date === date ? state : null;
+  return { data: current?.data, error: current?.error, refresh: () => load(true) };
+}
+
 export function Journal() {
   const r = useRange();
   const nav = useNavigate();
@@ -23,11 +83,13 @@ export function Journal() {
   const asked = params.get('date');
   const index = pages.length ? Math.max(0, asked ? pages.findIndex((d) => d.date === asked) : pages.length - 1) : -1;
   const current = index >= 0 ? pages[index] : undefined;
-  const { data: day, error: dayError } = useApi<DayDetail>(view === 'pages' && current ? `/days/${current.date}` : null);
+  const neighbours = [index - 1, index + 1, index - 2, index + 2].map((i) => pages[i]?.date).filter((d): d is string => !!d);
+  const page = usePage(view === 'pages' && current ? current.date : null, neighbours);
+  const day = page.data?.day;
+  const highlights = page.data?.highlights;
+  const dayError = page.error;
+  const reloadHighlights = page.refresh;
   const me = useMe();
-  const { data: highlights, reload: reloadHighlights } = useApi<Highlight[]>(
-    view === 'pages' && current ? `/highlights?from=${current.date}&to=${current.date}` : null,
-  );
   const highlight = async (h: HighlightInput) => {
     try {
       await api.post('/highlights', h);
