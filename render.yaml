@@ -80,3 +80,6 @@ services:
         generateValue: true
       - key: PUBLIC_URL
         value: https://journal-api-sv60.onrender.com
+      # The website's address when it's hosted on Vercel (used in invitation emails).
+      - key: PUBLIC_WEB_URL
+        sync: false

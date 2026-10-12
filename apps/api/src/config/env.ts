@@ -59,6 +59,9 @@ const envSchema = z.object({
   // Public https address of this server, e.g. https://journal-api-sv60.onrender.com
   // (defaults to the address the request came in on).
   PUBLIC_URL: z.string().trim().default(''),
+  // Where people open the website when it's hosted separately (e.g. on Vercel); used in
+  // invitation emails. Defaults to this server's address.
+  PUBLIC_WEB_URL: z.string().trim().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -141,6 +144,7 @@ export const config = {
     ownerEmail: env.DASHBOARD_OWNER_EMAIL,
     sessionSecret: env.DASHBOARD_SESSION_SECRET,
     sessionHours: env.DASHBOARD_SESSION_HOURS,
+    webUrl: env.PUBLIC_WEB_URL.replace(/\/+$/, ''),
   },
   google: {
     enabled: googleEnabled,

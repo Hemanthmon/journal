@@ -1,5 +1,6 @@
 import { Router, type Request } from 'express';
 import { ErrorCode, shareDashboardSchema, type ApiSuccess, type DashboardViewer, type ShareDashboardInput } from '@journal/shared';
+import { config } from '../../config/env';
 import { getPool } from '../../db/pool';
 import { AppError } from '../../lib/errors';
 import { requireUserId } from '../../middleware/authenticate';
@@ -10,7 +11,7 @@ import { getMailer, logMailFailure } from './mailer';
 import { activityFor } from './visits';
 
 /** The dashboard is served by this same server, so its address is the one the app called. */
-const dashboardUrl = (req: Request) => `${req.protocol}://${req.get('host')}/`;
+const dashboardUrl = (req: Request) => `${config.dashboard.webUrl || `${req.protocol}://${req.get('host')}`}/`;
 
 /**
  * Lets the owner choose, from the app, who can see their read-only web dashboard.
