@@ -9,7 +9,7 @@ import {
 import { habitsForDate, type HabitForDay } from './habits';
 import { getJournalDay, isAnswered, journalCompletion } from './journal';
 import { activeReminders } from './reminders';
-import { listUrges } from './urges';
+import { listUrges, trackingStart, urgeFreeStreak } from './urges';
 import type { Ctx } from './records';
 
 export interface HabitDaySummary {
@@ -62,20 +62,22 @@ export interface WeekDay {
   habitPercent: number | null;
   mood: number | null;
   journalWritten: boolean;
+  /** Urges recorded that day; null before tracking started (not a win, just empty). */
+  urges: number | null;
 }
 
 export interface Dashboard {
   today: string;
   habits: HabitDaySummary;
   journal: { answered: number; total: number; mood: number | null };
-  urges: { todayCount: number; recent: UrgeRecord[] };
+  urges: { todayCount: number; recent: UrgeRecord[]; streak: number; tracking: boolean };
   week: WeekDay[];
   reminders: ReminderRecord[];
   intention: { text: string; fromDate: string } | null;
 }
 
 export async function loadDashboard(ctx: Ctx, today: string): Promise<Dashboard> {
-  const [habits, journalDay, mood, todayUrges, recent, reminders, intention] = await Promise.all([
+  const [habits, journalDay, mood, todayUrges, recent, reminders, intention, streak, start] = await Promise.all([
     habitDaySummary(ctx, today),
     getJournalDay(ctx, today),
     moodFor(ctx, today),
@@ -83,6 +85,8 @@ export async function loadDashboard(ctx: Ctx, today: string): Promise<Dashboard>
     listUrges(ctx, { from: addDays(today, -6), to: today }),
     activeReminders(ctx),
     intentionFor(ctx, today),
+    urgeFreeStreak(ctx, today),
+    trackingStart(ctx),
   ]);
   const { answered, total } = journalCompletion(journalDay);
 
@@ -94,6 +98,7 @@ export async function loadDashboard(ctx: Ctx, today: string): Promise<Dashboard>
       habitPercent: h.percent,
       mood: m,
       journalWritten: j.questions.some((q) => q.type === 'text' && isAnswered(q.answer)),
+      urges: start && d >= start ? recent.filter((u) => u.localDate === d).length : null,
     });
   }
 
@@ -101,7 +106,7 @@ export async function loadDashboard(ctx: Ctx, today: string): Promise<Dashboard>
     today,
     habits,
     journal: { answered, total, mood },
-    urges: { todayCount: todayUrges.length, recent: recent.slice(0, 3) },
+    urges: { todayCount: todayUrges.length, recent: recent.slice(0, 3), streak, tracking: !!start && start <= today },
     week,
     reminders,
     intention,

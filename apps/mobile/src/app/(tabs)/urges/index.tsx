@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { Pressable, View } from 'react-native';
 import { addDays, formatShortDate, formatTime12, formatUrgeDuration, toLocalDate, weekdayName, weekdayOf } from '@journal/shared';
 import { Body, Button, Card, Chip, EmptyState, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { DateNavigator, MiniBars, shortDay } from '../../../components/widgets';
-import { listUrges, urgeTrends } from '../../../data/urges';
+import { listUrges, urgeTrends, trackingStart, urgeFreeStreak } from '../../../data/urges';
 import { radius, space, useTheme } from '../../../lib/theme';
 import { useCtx } from '../../../state/session';
 
@@ -27,6 +28,12 @@ export default function Urges() {
 
   const list = useQuery({ queryKey: ['urges', filter, day], queryFn: () => listUrges(ctx, range) });
   const trends = useQuery({ queryKey: ['urgeTrends', today], queryFn: () => urgeTrends(ctx, today, 7) });
+  const tracking = useQuery({
+    queryKey: ['urgeTracking', today],
+    queryFn: async () => ({ start: await trackingStart(ctx), streak: await urgeFreeStreak(ctx, today) }),
+  });
+  const start = tracking.data?.start ?? null;
+  const freeDays = trends.data && start ? trends.data.days.filter((d) => d.localDate >= start && d.count === 0).length : 0;
 
   return (
     <Screen>
@@ -38,9 +45,18 @@ export default function Urges() {
       />
       <Button title="Record an urge" variant="secondary" icon="add-circle-outline" onPress={() => router.push('/urges/new')} />
 
-      {trends.data && trends.data.total > 0 && (
+      {trends.data && (trends.data.total > 0 || freeDays > 0) && (
         <Card>
           <SectionTitle>Last 7 days</SectionTitle>
+          {freeDays > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: c.successSoft, borderRadius: 12, padding: space.sm }}>
+              <Ionicons name="leaf" size={18} color={c.success} />
+              <Body style={{ color: c.success, fontWeight: '700', flex: 1 }}>
+                {freeDays} urge-free day{freeDays === 1 ? '' : 's'} this week
+                {(tracking.data?.streak ?? 0) > 1 ? ` · ${tracking.data!.streak} in a row` : ''}
+              </Body>
+            </View>
+          )}
           <MiniBars
             label="Urges per day, last 7 days"
             max={Math.max(1, ...trends.data.days.map((d) => d.count))}
@@ -48,7 +64,7 @@ export default function Urges() {
               key: d.localDate,
               label: shortDay(d.localDate),
               value: d.count,
-              caption: String(d.count),
+              caption: d.count === 0 && start && d.localDate >= start ? '🌿' : String(d.count),
             }))}
           />
           <Muted>

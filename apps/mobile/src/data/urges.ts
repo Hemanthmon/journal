@@ -111,3 +111,30 @@ export async function urgeTrends(ctx: Ctx, today: string, days = 7): Promise<Urg
     topEmotions: topLabels(urges.map((u) => u.emotionBefore)),
   };
 }
+
+/** First day anything was tracked (an urge or a journal day); null if nothing yet. */
+export async function trackingStart(ctx: Ctx): Promise<string | null> {
+  const row = await ctx.db.get<{ d: string | null }>(
+    `SELECT MIN(d) AS d FROM (
+       SELECT MIN(local_date) AS d FROM urge_records WHERE deleted_at IS NULL
+       UNION ALL SELECT MIN(local_date) FROM daily_routines WHERE deleted_at IS NULL
+     )`,
+  );
+  return row?.d ?? null;
+}
+
+/**
+ * Urge-free days in a row up to and including `today` (0 if there was an urge today).
+ * Days before tracking started don't count as wins.
+ */
+export async function urgeFreeStreak(ctx: Ctx, today: string): Promise<number> {
+  const start = await trackingStart(ctx);
+  if (!start || start > today) return 0;
+  const last = await ctx.db.get<{ d: string | null }>(
+    'SELECT MAX(local_date) AS d FROM urge_records WHERE deleted_at IS NULL AND local_date <= ?',
+    [today],
+  );
+  const from = last?.d ? addDays(last.d, 1) : start;
+  const first = from > start ? from : start;
+  return first > today ? 0 : dateRange(first, today).length;
+}

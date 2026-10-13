@@ -143,11 +143,19 @@ export default function Dashboard() {
       {showUrges && (
         <Card>
           <SectionTitle>Urge tracker</SectionTitle>
-          <Body>
-            {urges.todayCount === 0
-              ? 'No urges recorded today'
-              : `${urges.todayCount} recorded today`}
-          </Body>
+          {urges.todayCount === 0 && urges.tracking ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: c.successSoft, borderRadius: radius.md, padding: space.md }}>
+              <Body style={{ fontSize: 22 }}>🌿</Body>
+              <View style={{ flex: 1 }}>
+                <Body style={{ color: c.success, fontWeight: '700' }}>Urge-free today</Body>
+                {urges.streak > 1 && <Muted>{urges.streak} urge-free days in a row. Keep going.</Muted>}
+              </View>
+            </View>
+          ) : (
+            <Body>
+              {urges.todayCount === 0 ? 'No urges recorded today' : `${urges.todayCount} recorded today`}
+            </Body>
+          )}
           {urges.recent.length > 0 && (
             <View style={{ gap: 4 }}>
               <Muted>Recent</Muted>
@@ -197,6 +205,29 @@ export default function Dashboard() {
             );
           })}
         </View>
+        {showUrges && (
+          <>
+            <Muted>Urges</Muted>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              {week.map((d) => (
+                <View
+                  key={d.localDate}
+                  accessible
+                  accessibilityLabel={`${shortDay(d.localDate)}: ${d.urges === null ? 'not tracked' : d.urges === 0 ? 'urge-free' : `${d.urges} urge${d.urges === 1 ? '' : 's'}`}`}
+                  style={{ flex: 1, alignItems: 'center' }}
+                >
+                  {d.urges === null ? (
+                    <Ionicons name="ellipse-outline" size={14} color={c.border} />
+                  ) : d.urges === 0 ? (
+                    <Ionicons name="leaf" size={16} color={c.success} />
+                  ) : (
+                    <Body style={{ color: c.warning, fontWeight: '700', fontSize: 14 }}>{d.urges}</Body>
+                  )}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
         <Muted>Journal</Muted>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           {week.map((d) => (

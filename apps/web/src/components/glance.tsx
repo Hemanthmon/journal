@@ -8,6 +8,7 @@ import {
   weekdayOf,
   type OutcomeCounts,
 } from '@journal/shared';
+import { useMe } from '../session';
 import { COLORS, Legend } from './charts';
 
 /**
@@ -331,23 +332,50 @@ export interface DayOutcome {
   unanswered: number;
 }
 
-type DayState = 'none' | 'diverted' | 'slip' | 'unanswered';
+type DayState = 'clear' | 'diverted' | 'slip' | 'unanswered' | 'untracked';
 const DAY_STATE: Record<DayState, { label: string; color: string }> = {
+  clear: { label: 'No urges 🌿', color: COLORS.success },
   diverted: { label: 'All diverted', color: COLORS.diverted },
   slip: { label: 'Some not diverted', color: COLORS.notDiverted },
   unanswered: { label: 'Not answered', color: COLORS.unanswered },
-  none: { label: 'No urges', color: 'var(--card-alt)' },
+  untracked: { label: 'Before tracking', color: 'var(--card-alt)' },
 };
 
+/** Urge-free days in a row, counting back from the last day shown. */
+export function urgeFreeStreak(days: { date: string; count: number }[], since: string): number {
+  let n = 0;
+  for (let i = days.length - 1; i >= 0; i--) {
+    const d = days[i]!;
+    if (d.date < since || d.count > 0) break;
+    n++;
+  }
+  return n;
+}
+
 export function OutcomeCalendar({ days, search }: { days: DayOutcome[]; search: string }) {
+  const me = useMe();
+  // Days before anything was recorded aren't wins, just empty.
   const state = (d: DayOutcome): DayState =>
-    d.count === 0 ? 'none' : d.notDiverted > 0 ? 'slip' : d.diverted > 0 ? 'diverted' : 'unanswered';
-  const counts = { none: 0, diverted: 0, slip: 0, unanswered: 0 } as Record<DayState, number>;
+    d.count === 0
+      ? d.date < me.firstDate || d.date > me.today
+        ? 'untracked'
+        : 'clear'
+      : d.notDiverted > 0
+        ? 'slip'
+        : d.diverted > 0
+          ? 'diverted'
+          : 'unanswered';
+  const counts = { clear: 0, diverted: 0, slip: 0, unanswered: 0, untracked: 0 } as Record<DayState, number>;
   for (const d of days) counts[state(d)]++;
+  const streak = urgeFreeStreak(
+    days.filter((d) => d.date <= me.today),
+    me.firstDate,
+  );
   return (
+    <>
     <DayCalendar
       search={search}
-      legend={(['diverted', 'slip', 'unanswered', 'none'] as DayState[]).map((s) => ({
+      legend={(['clear', 'diverted', 'slip', 'unanswered'] as DayState[]).map((s) => ({
         label: `${DAY_STATE[s].label} (${counts[s]})`,
         color: DAY_STATE[s].color,
       }))}
@@ -360,12 +388,18 @@ export function OutcomeCalendar({ days, search }: { days: DayOutcome[]; search: 
         return {
           date: d.date,
           color: DAY_STATE[s].color,
-          empty: s === 'none',
+          empty: s === 'untracked',
           light: s === 'unanswered',
-          description: `${dayName(d.date)}: ${d.count ? parts.join(', ') : 'no urges'}`,
+          description: `${dayName(d.date)}: ${d.count ? parts.join(', ') : s === 'clear' ? 'no urges 🌿' : 'before tracking'}`,
         };
       })}
     />
+    {streak > 0 && (
+      <p className="small" style={{ margin: '6px 0 0', color: COLORS.success, fontWeight: 600 }}>
+        🌿 {streak} urge-free day{streak === 1 ? '' : 's'} in a row
+      </p>
+    )}
+    </>
   );
 }
 
