@@ -1,3 +1,4 @@
+import { addDays } from '../dates';
 import { z } from 'zod';
 import {
   baseRecordShape,
@@ -99,4 +100,50 @@ export function formatUrgeDuration(minutes: number | null | undefined): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m ? `${h} hr ${m} min` : `${h} hr`;
+}
+
+// ------------------------------------------------------------------ urge-free days
+
+export type UrgeListItem<U extends { id: string; localDate: string } = UrgeRecord> =
+  | { kind: 'urge'; urge: U }
+  /** Urge-free days in a row; `to` is the later day (lists run newest first). */
+  | { kind: 'free'; from: string; to: string; days: number };
+
+/**
+ * A newest-first urge list as a day-by-day story: each urge, plus one line for each run of
+ * urge-free days between `from` and `to`, counted only from `start` (when tracking began).
+ */
+export function withUrgeFreeDays<U extends { id: string; localDate: string }>(
+  urges: U[],
+  from: string,
+  to: string,
+  start: string | null,
+): UrgeListItem<U>[] {
+  const begin = start && start > from ? start : from;
+  const byDay = new Map<string, U[]>();
+  for (const u of urges) byDay.set(u.localDate, [...(byDay.get(u.localDate) ?? []), u]);
+  const out: UrgeListItem<U>[] = [];
+  let run: { from: string; to: string; days: number } | null = null;
+  const flush = () => {
+    if (run) out.push({ kind: 'free', ...run });
+    run = null;
+  };
+  if (start && begin <= to) {
+    for (let d = to; d >= begin; d = addDays(d, -1)) {
+      const day = byDay.get(d);
+      if (day?.length) {
+        flush();
+        for (const u of day) out.push({ kind: 'urge', urge: u });
+      } else if (run) {
+        run = { from: d, to: run.to, days: run.days + 1 };
+      } else {
+        run = { from: d, to: d, days: 1 };
+      }
+    }
+    flush();
+  }
+  // Urges outside the tracked window still appear, after the rest.
+  const shown = new Set(out.flatMap((i) => (i.kind === 'urge' ? [i.urge.id] : [])));
+  for (const u of urges) if (!shown.has(u.id)) out.push({ kind: 'urge', urge: u });
+  return out;
 }

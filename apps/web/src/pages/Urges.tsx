@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
-import { formatShortDate, formatUrgeDuration, type OutcomeCounts, type UrgeAnalytics } from '@journal/shared';
+import { formatShortDate, formatUrgeDuration, withUrgeFreeDays, type OutcomeCounts, type UrgeAnalytics } from '@journal/shared';
 import { useApi } from '../api';
 import { COLORS, ChartBox, DayLines, Legend, OUTCOME_SERIES, shortDate, tick, tooltipStyle } from '../components/charts';
 import { DivertedRing, Insights, OutcomeCalendar, TimeHeatmap } from '../components/glance';
@@ -240,7 +240,7 @@ export function Urges() {
 
       <Card title={`All records (${data.records.length})`}>
         {data.records.length === 0 ? (
-          <Empty>No urges recorded in this period.</Empty>
+          <div className="urge-free-empty">🌿 No urges recorded in this period. Well done.</div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -260,7 +260,20 @@ export function Urges() {
                 </tr>
               </thead>
               <tbody>
-                {data.records.map((u) => (
+                {withUrgeFreeDays(data.records, data.range.from, data.range.to < me.today ? data.range.to : me.today, me.firstDate).map((item) => {
+                  if (item.kind === 'free') {
+                    const one = item.days === 1;
+                    return (
+                      <tr key={`free-${item.to}`} className="urge-free-row">
+                        <td colSpan={11}>
+                          🌿 <strong>{one ? 'No urges' : `${item.days} urge-free days`}</strong>{' '}
+                          <span className="small">{one ? formatShortDate(item.to) : `${formatShortDate(item.from)} – ${formatShortDate(item.to)}`}</span>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  const u = item.urge;
+                  return (
                   <tr key={u.id}>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <Link to={{ pathname: `/day/${u.localDate}`, search: r.search }}>{formatShortDate(u.localDate)}</Link>
@@ -284,7 +297,8 @@ export function Urges() {
                     <td>{yesNo(u.explicitContent)}</td>
                     <td>{u.remarks ?? '—'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

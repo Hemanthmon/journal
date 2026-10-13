@@ -6,7 +6,7 @@ import { Pressable, View } from 'react-native';
 import { addDays, formatShortDate, formatTime12, formatUrgeDuration, toLocalDate, weekdayName, weekdayOf } from '@journal/shared';
 import { Body, Button, Card, Chip, EmptyState, Loading, Muted, Screen, SectionTitle } from '../../../components/ui';
 import { DateNavigator, MiniBars, shortDay } from '../../../components/widgets';
-import { listUrges, urgeTrends, trackingStart, urgeFreeStreak } from '../../../data/urges';
+import { listUrges, urgeTrends, trackingStart, urgeFreeStreak, withUrgeFreeDays } from '../../../data/urges';
 import { radius, space, useTheme } from '../../../lib/theme';
 import { useCtx } from '../../../state/session';
 
@@ -87,13 +87,39 @@ export default function Urges() {
       </View>
       {filter === 'day' && <DateNavigator date={day} onChange={setDay} />}
 
-      {list.isLoading || !list.data ? (
+      {list.isLoading || !list.data || tracking.isLoading ? (
         <Loading />
-      ) : list.data.length === 0 ? (
-        <EmptyState icon="pulse-outline" title="No records for this period" />
-      ) : (
+      ) : (() => {
+        // Urges plus the urge-free stretches between them (from when tracking began).
+        const items = withUrgeFreeDays(list.data, range.from ?? start ?? today, range.to ?? today, start);
+        if (items.length === 0) return <EmptyState icon="pulse-outline" title="No records for this period" />;
+        return (
         <View style={{ gap: space.sm }}>
-          {list.data.map((u) => (
+          {items.map((item) => {
+            if (item.kind === 'free') {
+              const one = item.days === 1;
+              const when = one
+                ? `${weekdayName(weekdayOf(item.to))} ${formatShortDate(item.to)}`
+                : `${formatShortDate(item.from)} – ${formatShortDate(item.to)}`;
+              return (
+                <View
+                  key={`free-${item.to}`}
+                  accessible
+                  accessibilityLabel={one ? `${when}: no urges` : `${item.days} urge-free days, ${when}`}
+                  style={{ backgroundColor: c.successSoft, borderRadius: radius.md, paddingVertical: space.sm, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center', gap: space.md }}
+                >
+                  <View style={{ width: 44, alignItems: 'center' }}>
+                    <Ionicons name="leaf" size={20} color={c.success} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Body style={{ color: c.success, fontWeight: '700' }}>{one ? 'No urges' : `${item.days} urge-free days`}</Body>
+                    <Muted>{when}</Muted>
+                  </View>
+                </View>
+              );
+            }
+            const u = item.urge;
+            return (
             <Pressable
               key={u.id}
               accessibilityRole="button"
@@ -129,9 +155,11 @@ export default function Urges() {
                 <Muted numberOfLines={1}>{u.triggerText ?? u.emotionBefore ?? 'No details'}</Muted>
               </View>
             </Pressable>
-          ))}
+            );
+          })}
         </View>
-      )}
+        );
+      })()}
     </Screen>
   );
 }
